@@ -15,6 +15,13 @@
 		"php": ">=5.3",
 		"ext-pdo": "*"
 	},
+	"provide": {
+		"phpf/util": "dev-master",
+		"phpf/event": "dev-master",
+		"phpf/http": "dev-master",
+		"phpf/config": "dev-master",
+		"phpf/filesystem": "dev-master"
+	},
 	"autoload": {
 		"psr-0": {
 			"Phpf\\": "src/"
