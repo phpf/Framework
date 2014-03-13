@@ -1,0 +1,24 @@
+{
+	"name": "phpf/framework",
+	"type": "library",
+	"description": "Phpf Framework",
+	"keywords": ["Framework", "Micro-framework"],
+	"homepage": "https://github.com/phpf/Framework",
+	"license": "MIT",
+	"authors": [
+		{
+			"name": "The PHPf Developer",
+			"email": "wellspeterson@live.com"
+		}
+	],
+	"require": {
+		"php": ">=5.3",
+		"ext-pdo": "*"
+	},
+	"autoload": {
+		"psr-0": {
+			"Phpf\\": "src/"
+		}
+	},
+	"minimum-stability": "dev"
+}
