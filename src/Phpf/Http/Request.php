@@ -67,46 +67,59 @@ class Request {
 	 * Whether to allow method override via Header or param
 	 * @var boolean
 	 */
-	public static $allow_method_override = true;
+	public $allow_method_override = true;
 	
 	/**
-	 * Built request from $server array
+	 * Build request from $server array
 	 */
-	public function __construct( array $server = null ){
+	public function __construct( array $server = null, array $query_params = null ){
 		
 		if ( empty($server) ){
 			$server =& $_SERVER;
 		}
 		
-		$uri	= $this->clean(urldecode($server['REQUEST_URI']));
-		$query	= $this->clean(urldecode($server['QUERY_STRING']));
+		$this->headers = Http::requestHeaders($server);
 		
-		// Remove query string from uri and convert to array
-		if ( !empty($query) ){
-			$uri = str_replace("?$query", '', $uri);
+		$this->query = $this->clean(urldecode($server['QUERY_STRING']));
+		
+		// Set request path
+		if (isset($server['PATH_INFO'])) {
+			$uri = urldecode($server['PATH_INFO']);
+		} else {
+			$uri = urldecode($server['REQUEST_URI']);
+			// Remove query string from path
+			$uri = str_replace("?$this->query", '', $uri);
 		}
 		
-		$this->uri		= $uri;
-		$this->query	= $query;
-		$this->headers	= Http::requestHeaders($server);
+		$this->uri = $this->clean($uri);
 		
-		$method = $server['REQUEST_METHOD'];
+		if (isset($query_params)) {
+			$this->query_params = $query_params;
+		} else {
+			$this->query_params = $_GET;
+		}
 		
-		$this->query_params = $_GET;
+		// Use real request method to determine body params
+		if (isset($server['REQUEST_METHOD'])) {
+			$method = $server['REQUEST_METHOD'];
+		}
 		
-		if ( 'GET' === $method || 'POST' === $method ){
+		// Set body params to $_POST if POST, otherwise use php://input
+		if (isset($method) && 'POST' === $method ){
 			$this->body_params = $_POST;
 		} else {
 			parse_str($this->clean(file_get_contents('php://input')), $this->body_params);
 		}
 		
-		// Override method if permitted
-		if ( self::$allow_method_override ){
-			
-			if ( isset($this->headers['x-http-method-override'] ) )
+		// Override request method if permitted
+		if ($this->allow_method_override) {
+				
+			// X-HTTP-METHOD-OVERRIDE header
+			if (isset($this->headers['x-http-method-override']))
 				$method = $this->headers['x-http-method-override'];
 			
-			if ( isset($this->query_params['_method']) )
+			// _method query parameter
+			if (isset($this->query_params['_method']))
 				$method = $this->query_params['_method'];
 		}
 		
@@ -137,7 +150,6 @@ class Request {
 	public function setPathParams( array $params ){
 		$this->path_params = $params;
 		$this->params = array_merge($this->params, $this->path_params);
-		$_REQUEST = $this->params;
 		return $this;
 	}
 	
@@ -167,6 +179,13 @@ class Request {
 	*/
 	public function getParams(){
 		return $this->params;
+	}
+	
+	/**
+	 * Returns true if a parameter is set.
+	 */
+	public function paramExists($name) {
+		return isset($this->params[$name]);
 	}
 	
 	/**
@@ -230,7 +249,7 @@ class Request {
 	 * Disallow HTTP method override via header and query param.
 	 */
 	public function disallowMethodOverride(){
-		self::$allow_method_override = false;
+		$this->allow_method_override = false;
 		return $this;
 	}
 	
@@ -238,7 +257,7 @@ class Request {
 	 * Allow HTTP method override via header and query param.
 	 */
 	public function allowMethodOverride(){
-		self::$allow_method_override = true;
+		$this->allow_method_override = true;
 		return $this;
 	}
 	
@@ -246,7 +265,7 @@ class Request {
 	* Strips naughty text and slashes from uri components
 	*/
 	protected function clean( $str ){
-		return trim(htmlentities(strip_tags($str), ENT_COMPAT), '/');	
+		return trim(filter_var($str, FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_HIGH), '/');	
 	}
 	
 }

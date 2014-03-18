@@ -67,22 +67,22 @@ class Response {
 	 */
 	public function __construct( Request $request ) {
 
-		if ( Request\Headers::acceptEncoding('gzip', $request->headers) && extension_loaded('zlib') ) {
+		if (Request\Headers::acceptEncoding('gzip', $request->headers) && extension_loaded('zlib')) {
 			$this->gzip = true;
 		} else {
 			$this->gzip = false;
 		}
 
-		if ( $request->isXhr() ) {
+		if ($request->isXhr()) {
 			$this->setCacheHeaders(false);
 			$this->setContentTypeOptionsHeader('nosniff');
 			$this->setFrameOptionsHeader('deny');
 		}
 
 		// first try to set content type using parameter
-		if ( ! isset($request->content_type) || ! $this->maybeSetContentType($request->content_type) ) {
+		if (! isset($request->content_type) || ! $this->maybeSetContentType($request->content_type)) {
 			// set content type using header
-			if ( $type = Request\Headers::accept($this->allowed_content_types, $request->headers) ) {
+			if ($type = Request\Headers::accept($this->allowed_content_types, $request->headers)) {
 				$this->content_type = $type;
 			}
 		}
@@ -93,7 +93,7 @@ class Response {
 	 */
 	public function send() {
 
-		if ( ! isset($this->headers['Cache-Control']) ) {
+		if (! isset($this->headers['Cache-Control'])) {
 			$this->nocache();
 		}
 
@@ -126,7 +126,7 @@ class Response {
 
 		if ( $overwrite || empty($this->body) ) {
 
-			if ( is_object($value) && ! $value = $this->objectStr($value) ) {
+			if (is_object($value) && ! $value = $this->objectStr($value)) {
 				trigger_error('Cannot set object as body - no __toString() method.', E_USER_NOTICE);
 				return $this;
 			}
@@ -142,12 +142,12 @@ class Response {
 	 */
 	public function addBody( $value, $how = 'append' ) {
 
-		if ( is_object($value) && ! $value = $this->objectStr($value) ) {
+		if (is_object($value) && ! $value = $this->objectStr($value)) {
 			trigger_error('Cannot set object as body - no __toString() method.', E_USER_NOTICE);
 			return $this;
 		}
 
-		if ( 'prepend' === $how || 'before' === $how ) {
+		if ('prepend' === $how || 'before' === $how) {
 			$this->body = $value . $this->body;
 		} else {
 			$this->body .= $value;
