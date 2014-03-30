@@ -6,16 +6,21 @@ class Str {
 	
 	/**
 	 * Use htmlentities() with ENT_COMPAT
+	 * most aggressive
+	 * @var string
 	 */
 	const ESC_HTML = 'html';
 	
 	/**
-	 * Strip ISO-8851-1 chars (above 128).
+	 * Strip ISO-8851-1 chars (ASCII >= 128).
+	 * @var string
 	 */
 	const ESC_ASCII = 'ascii';
 	
 	/**
 	 * Allow all ISO-8851-1 chars.
+	 * least aggressive
+	 * @var string
 	 */
 	const ESC_ISO = 'iso';
 	
@@ -30,13 +35,13 @@ class Str {
 		
 		preg_replace('/[\x00-\x08\x0B-\x1F]/', '', $string);
 		
-		if ( $flag == self::ESC_HTML ){
+		if ($flag == self::ESC_HTML) {
 			return htmlentities(strip_tags($string), ENT_QUOTES, false);
 		}
 		
-		if ( $flag == self::ESC_ASCII ){
+		if ($flag == self::ESC_ASCII) {
 			$flag = FILTER_FLAG_STRIP_HIGH;
-		} elseif ( $flag == self::ESC_ISO ){
+		} elseif ($flag == self::ESC_ISO) {
 			$flag = FILTER_FLAG_NONE;
 		}
 			
@@ -57,6 +62,10 @@ class Str {
 	 * Strips non-alphanumeric characters from a string.
 	 * Add characters to $extras to preserve those as well.
 	 * Extra chars should be escaped for use in preg_*() functions.
+	 * 
+	 * @param string $str String to escape.
+	 * @param array|null $extras Other characters to strip.
+	 * @return string Escaped string.
 	 */
 	public static function escAlnum( $str, array $extras = null ){
 		
@@ -72,28 +81,60 @@ class Str {
 	}
 		
 	/**
-	* Returns true if $haystack starts with $needle.
-	*/
+	 * Returns true if $haystack starts with $needle.
+	 * 
+	 * @param string $haystack String to search within.
+	 * @param string $needle String to find.
+	 * @return boolean 
+	 */
 	public static function startsWith( $haystack, $needle ) {
 		return 0 === strpos($haystack, $needle);
 	}
 	
 	/**
-	* Returns true if $haystack ends $needle.
-	*/
+	 * Returns true if $haystack ends with $needle.
+	 * 
+	 * @param string $haystack String to search within.
+	 * @param string $needle String to find.
+	 * @return boolean 
+	 */
 	public static function endsWith( $haystack, $needle ) {
 		return $needle === substr($haystack, -strlen($needle));
 	}
 	
 	/**
 	 * Returns true if $haystack contains $needle.
+	 * 
+	 * @param string $haystack String to search within.
+	 * @param string $needle String to find.
+	 * @return boolean 
 	 */
 	public static function contains( $haystack, $needle ){
 		return false !== strpos($haystack, $needle);
 	}
 	
 	/**
-	 * Returns substring of $haystack starting at end of $needle.
+	 * Removes all found instances of a string from a string.
+	 * 
+	 * Note the function uses str_replace(), so arrays may be
+	 * passed for either parameter as well.
+	 * 
+	 * @param string $str String to search and destroy.
+	 * @param string $from The string to search within.
+	 * @return string The stripped string.
+	 */
+	public static function strip($str, $from) {
+		return str_replace($str, '', $from);
+	}
+	
+	/**
+	 * Returns part of a string starting at the end of a contained string.
+	 * 
+	 * Returns the segment of $haystack starting at end of $needle.
+	 * 
+	 * @param string $haystack String to search within.
+	 * @param string $needle String to find.
+	 * @return string|null String segment if $needle found, otherwise NULL 
 	 */
 	public static function substrAfter($haystack, $needle) {
 			
@@ -104,6 +145,15 @@ class Str {
 		return null;
 	}
 	
+	/**
+	 * Returns part of a string up to the first occurance of another string.
+	 * 
+	 * Returns the segment of $haystack up to $needle.
+	 * 
+	 * @param string $haystack String to search within.
+	 * @param string $needle String to find.
+	 * @return string|null String segment if $needle found, otherwise NULL 
+	 */
 	public static function substrBefore($haystack, $needle) {
 		
 		if (false !== ($pos = strpos($haystack, $needle))) {
@@ -114,8 +164,10 @@ class Str {
 	}
 		
 	/** 
-	 * Returns 1st occurance of text between two strings. 
+	 * Returns 1st occurance of text between two strings.
+	 * 
 	 * The "between" strings are not included in output.
+	 * 
 	 * @param string $source The string in which to search.
 	 * @param string $start The starting string
 	 * @param string $end The ending string
@@ -135,7 +187,7 @@ class Str {
 		
 		$encoding = mb_detect_encoding($str);
 		
-		if ( 'UTF-8' !== $encoding || 'ASCII' !== $encoding ){
+		if ('UTF-8' !== $encoding || 'ASCII' !== $encoding){
 			$str = mb_convert_encoding($str, 'UTF-8');
 		}
 		
@@ -295,90 +347,6 @@ class Str {
 	}
 	
 	/**
-	 * Serialize data, if needed.
-	 *
-	 * @param mixed $data Data that might be serialized.
-	 * @return mixed A scalar data
-	 */
-	public static function maybeSerialize( $data ) {
-		if ( is_array($data) || is_object($data) )
-			return serialize($data);
-		return $data;
-	}
-	
-	/**
-	 * Unserialize value only if it was serialized.
-	 *
-	 * @param string $value Maybe unserialized original, if is needed.
-	 * @return mixed Unserialized data can be any type.
-	 */
-	public static function maybeUnserialize( $value ) {
-		if ( self::isSerialized($value) )
-			return @unserialize($value);
-		return $value;
-	}
-	
-	/**
-	 * Check value to find if it was serialized.
-	 *
-	 * @param mixed $data Value to check to see if was serialized.
-	 * @param bool $strict Optional. Whether to be strict about the end of the string. Defaults true.
-	 * @return bool False if not serialized and true if it was.
-	 */
-	public static function isSerialized( $data, $strict = true ) {
-			
-		if ( ! is_string($data) )
-			return false;
-		
-		$data = trim($data);
-	 	
-	 	if ( 'N;' == $data ) 
-	 		return true; // serialized null
-		
-		$length = strlen($data);
-		
-		if ( $length < 4 || ':' !== $data[1] )
-			return false; // no datatype char
-		
-		if ( $strict ) {
-			$lastc = $data[$length-1];
-			if ( ';' !== $lastc && '}' !== $lastc )
-				return false;
-		} else {
-			$semicolon = strpos($data, ';');
-			$brace     = strpos($data, '}');
-			// Either ; or } must exist, but neither 
-			// must be in the first X characters.
-			if ( (false === $semicolon && false === $brace)
-				|| (false !== $semicolon && $semicolon < 3)
-				|| (false !== $brace && $brace < 4) ) 
-			{
-				return false;
-			}
-		}
-		
-		$token = $data[0];
-		
-		switch ($token){
-			case 's' :
-				if ( ($strict && '"' !== $data[$length-2]) || false === strpos($data, '"') ){
-					return false;
-				}
-				// or else fall through
-			case 'a' :
-			case 'O' :
-				return (bool) preg_match( "/^{$token}:[0-9]+:/s", $data );
-			case 'b' :
-			case 'i' :
-			case 'd' :
-				$end = $strict ? '$' : '';
-				return (bool) preg_match( "/^{$token}:[0-9.E-]+;$end/", $data );
-		}
-		
-		return false;
-	}
-	
-	/**
 	 * Writes an array of data as CSV to a file.
 	 */
 	public static function writeCsv( array $data, $filepath ){
@@ -486,4 +454,88 @@ class Str {
 		return $new_json;	
 	}
 
+	/**
+	 * Serialize data, if needed.
+	 *
+	 * @param mixed $data Data that might be serialized.
+	 * @return mixed A scalar data
+	 */
+	public static function maybeSerialize( $data ) {
+		if ( is_array($data) || is_object($data) )
+			return serialize($data);
+		return $data;
+	}
+	
+	/**
+	 * Unserialize value only if it was serialized.
+	 *
+	 * @param string $value Maybe unserialized original, if is needed.
+	 * @return mixed Unserialized data can be any type.
+	 */
+	public static function maybeUnserialize( $value ) {
+		if ( self::isSerialized($value) )
+			return @unserialize($value);
+		return $value;
+	}
+	
+	/**
+	 * Check value to find if it was serialized.
+	 *
+	 * @param mixed $data Value to check to see if was serialized.
+	 * @param bool $strict Optional. Whether to be strict about the end of the string. Defaults true.
+	 * @return bool False if not serialized and true if it was.
+	 */
+	public static function isSerialized( $data, $strict = true ) {
+			
+		if ( ! is_string($data) )
+			return false;
+		
+		$data = trim($data);
+	 	
+	 	if ( 'N;' == $data ) 
+	 		return true; // serialized null
+		
+		$length = strlen($data);
+		
+		if ( $length < 4 || ':' !== $data[1] )
+			return false; // no datatype char
+		
+		if ( $strict ) {
+			$lastc = $data[$length-1];
+			if ( ';' !== $lastc && '}' !== $lastc )
+				return false;
+		} else {
+			$semicolon = strpos($data, ';');
+			$brace     = strpos($data, '}');
+			// Either ; or } must exist, but neither 
+			// must be in the first X characters.
+			if ( (false === $semicolon && false === $brace)
+				|| (false !== $semicolon && $semicolon < 3)
+				|| (false !== $brace && $brace < 4) ) 
+			{
+				return false;
+			}
+		}
+		
+		$token = $data[0];
+		
+		switch ($token){
+			case 's' :
+				if ( ($strict && '"' !== $data[$length-2]) || false === strpos($data, '"') ){
+					return false;
+				}
+				// or else fall through
+			case 'a' :
+			case 'O' :
+				return (bool) preg_match( "/^{$token}:[0-9]+:/s", $data );
+			case 'b' :
+			case 'i' :
+			case 'd' :
+				$end = $strict ? '$' : '';
+				return (bool) preg_match( "/^{$token}:[0-9.E-]+;$end/", $data );
+		}
+		
+		return false;
+	}
+	
 }

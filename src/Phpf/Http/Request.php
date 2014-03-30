@@ -64,22 +64,35 @@ class Request {
 	public $xhr = false;
 	
 	/**
+	 * Content type requested.
+	 * @var string
+	 */
+	public $content_type;
+	
+	/**
 	 * Whether to allow method override via Header or param
 	 * @var boolean
 	 */
-	public $allow_method_override = true;
+	protected $allow_method_override = true;
+	
+	/**
+	 * Indexed array of content types that will be respected.
+	 * If an invalid or no type is requested, the default is used.
+	 * @see Response
+	 * @var array
+	 */
+	protected $allow_content_types = array('html', 'json', 'jsonp', 'xml');
 	
 	/**
 	 * Build request from $server array
 	 */
-	public function __construct( array $server = null, array $query_params = null ){
+	public function __construct(array $server = null, array $query = null){
 		
-		if ( empty($server) ){
+		if (empty($server))	{
 			$server =& $_SERVER;
 		}
 		
 		$this->headers = Http::requestHeaders($server);
-		
 		$this->query = $this->clean(urldecode($server['QUERY_STRING']));
 		
 		// Set request path
@@ -96,16 +109,15 @@ class Request {
 		if (isset($query_params)) {
 			$this->query_params = $query_params;
 		} else {
-			$this->query_params = $_GET;
+			parse_str($this->query, $this->query_params);
 		}
 		
-		// Use real request method to determine body params
 		if (isset($server['REQUEST_METHOD'])) {
 			$method = $server['REQUEST_METHOD'];
 		}
 		
-		// Set body params to $_POST if POST, otherwise use php://input
-		if (isset($method) && 'POST' === $method ){
+		// @TODO reconsider just using php://input on body for all methods
+		if (isset($method) && Http::METHOD_POST === $method) {
 			$this->body_params = $_POST;
 		} else {
 			parse_str($this->clean(file_get_contents('php://input')), $this->body_params);
@@ -113,12 +125,8 @@ class Request {
 		
 		// Override request method if permitted
 		if ($this->allow_method_override) {
-				
-			// X-HTTP-METHOD-OVERRIDE header
 			if (isset($this->headers['x-http-method-override']))
 				$method = $this->headers['x-http-method-override'];
-			
-			// _method query parameter
 			if (isset($this->query_params['_method']))
 				$method = $this->query_params['_method'];
 		}
@@ -126,22 +134,21 @@ class Request {
 		$this->method = strtoupper(trim($method));
 		
 		// Is this an XHR request?
-		if ( isset($this->headers['x-requested-with']) ){
-			$this->xhr = (bool) 'XMLHttpRequest' === $this->headers['x-requested-with'];
+		if (isset($this->headers['x-requested-with'])) {
+			$this->xhr = ('XMLHttpRequest' === $this->headers['x-requested-with']);
 		}
 		
 		$this->params = array_merge($this->query_params, $this->body_params);
+		
+		// switch to keys for isset() 
+		$this->allow_content_types = array_fill_keys($this->allow_content_types, true);
 	}
 	
 	/**
 	 * Magic __get() gets parameters.
 	 */
-	public function __get( $var ){
-		
-		if ( isset($this->params[$var]) )
-			return $this->params[$var];
-		
-		return null;
+	public function __get($var) {
+		return isset($this->params[$var]) ? $this->params[$var] : null;
 	}
 	
 	/**
@@ -225,24 +232,50 @@ class Request {
 	}
 	
 	/**
-	 * Am I a GET request?
+	 * Boolean method/xhr checker.
 	 */
+	public function is($thing) {
+		switch(strtoupper($thing)) {
+			case Http::METHOD_GET :
+				return Http::METHOD_GET === $this->method;
+			case Http::METHOD_POST :
+				return Http::METHOD_POST === $this->method;
+			case Http::METHOD_PUT :
+				return Http::METHOD_PUT === $this->method;
+			case Http::METHOD_HEAD :
+				return Http::METHOD_HEAD === $this->method;
+			case Http::METHOD_DELETE :
+				return Http::METHOD_DELETE === $this->method;
+			case Http::METHOD_OPTIONS :
+				return Http::METHOD_OPTIONS === $this->method;
+			case Http::METHOD_PATCH :
+				return Http::METHOD_PATCH === $this->method;
+			case 'XHR' :
+			case 'AJAX' :
+				return $this->isXhr();
+			default :
+				return null;
+		}
+	}
+	
+	/** Am I a GET request? */
 	public function isGet(){
-		return Http::METHOD_GET === $this->method;
+		return $this->is(Http::METHOD_GET);
 	}
 	
-	/**
-	 * Am I a POST request?
-	 */
+	/** Am I a POST request? */
 	public function isPost(){
-		return Http::METHOD_POST === $this->method;
+		return $this->is(Http::METHOD_POST);
 	}
 	
-	/**
-	 * Am I a HEAD request?
-	 */
+	/**  Am I a PUT request? */
+	public function isPut(){
+		return $this->is(Http::METHOD_PUT);
+	}
+	
+	/** Am I a HEAD request? */
 	public function isHead(){
-		return Http::METHOD_HEAD === $this->method;
+		return $this->is(Http::METHOD_HEAD);
 	}
 	
 	/**
@@ -262,8 +295,29 @@ class Request {
 	}
 	
 	/**
-	* Strips naughty text and slashes from uri components
-	*/
+	 * Returns true if given response content-type is allowed.
+	 */
+	public function isContentTypeAllowed( $type ) {
+		return isset($this->allow_content_types[$type]);
+	}
+	
+	/**
+	 * Sets the requested content type if valid, for later reference.
+	 */
+	public function setContentType( $type ) {
+		
+		if ($this->isContentTypeAllowed($type)) {
+			$this->content_type = $type;
+			return true;
+		}
+		
+		return false;
+	}
+
+	/**
+	 * Strips naughty text and slashes from uri components
+	 * @uses filter_var() with FILTER_SANITIZE_STRING
+	 */
 	protected function clean( $str ){
 		return trim(filter_var($str, FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_HIGH), '/');	
 	}

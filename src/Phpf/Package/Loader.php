@@ -7,84 +7,70 @@ use Phpf\Event\Container as Events;
 
 class Loader {
 	
-	protected $routes_file = '/config/routes.php';
+	protected $app;
 	
-	protected $tables_file = '/config/tables.php';
+	protected $config;
 	
-	protected $views_dir = '/Views/';
+	protected $default_config = array(
+		'dirs' => array(
+			'views' => 'views',
+			'assets' => 'public',
+		),
+		'files' => array(
+			'config/routes.php',
+			'config/tables.php',
+		),
+	);
 	
-	protected $assets_dir = '/Public/';
-	
-	protected $filesystem;
-	
-	public function __construct( Filesystem &$filesystem ){
-		$this->filesystem =& $filesystem;
+	public function __construct(\Phpf\App\App &$app){
+			
+		$this->app =& $app;
+		
+		$this->configure($app->get('config')->get('packages-config'));
 	}
 	
 	/**
 	 * Loads the package.
-	 * 
-	 * 1. Loads PHP file in base directory with same name as package.
-	 * 2. Loads /config/routes.php if it exists.
-	 * 3. Loads /config/tables.php if it exists.
-	 * 4. Adds /Views/ directory to filesystem under "views" group if it exists.
-	 * 5. Adds /Public/ directory to fs under "assets" group if it exists.
 	 */
 	public function load( iPackage $package ){
+			
+		$app = $this->app;
+	
+		$pPath = rtrim($package->getPath(), '/\\') . '/';
+		$pName = basename($package->getPath());
 		
-		$pkgPath = $package->getPath();
-		$pkgName = basename($pkgPath);
-		
-		$fpackage = $pkgPath.'/'.$pkgName.'.php';
-		$froutes = $pkgPath.$this->routes_file;
-		$ftables = $pkgPath.$this->tables_file;
-		$dviews = $pkgPath.$this->views_dir;
-		$dassets = $pkgPath.$this->assets_dir;
+		$pkgFile = $pPath.$pName.'.php';
 		
 		// Search in base directory for a file with the same name
-		if (file_exists($fpackage)){
+		if (file_exists($pkgFile)){
 			
 			$include = function ($__file__){
 				require $__file__;
 			};
 			
-			$include($fpackage);
+			$include($pkgFile);
 		}
 		
-		// routes
-		if (file_exists($froutes)){
-				
-			$include = function ($__file__) {
-					
-				$router = \Router::instance();
-					
-				require $__file__;
-			};
-			
-			$include($froutes);
+		$includeWithObject = function ($_file) use($pPath, $app) {
+			$_file = ltrim($_file, '/\\');
+			if (file_exists($pPath.$_file)) {
+				require $pPath.$_file;
+			}
+		};
+		
+		$addFilesystemPaths = function ($_dir, $_group) use($pPath, $app) {
+			$_dir = trim($_dir, '/\\');
+			if (is_dir($pPath.$_dir)){
+				$this->app->get('filesystem')->add($pPath.$_dir.'/', $_group);
+			}
+		};
+		
+		foreach($this->config['files'] as $file) {
+			$includeWithObject($file);
 		}
 		
-		// tables
-		if (file_exists($ftables)){
-				
-			$include = function ($__file__) {
-					
-				$database = \Database::instance();
-				
-				require $__file__;
-			};
-			
-			$include($ftables);
-		}
-		
-		// views
-		if (is_dir($dviews)){
-			$this->filesystem->add($dviews, 'views');
-		}
-		
-		// assets
-		if (is_dir($dassets)){
-			$this->filesystem->add($dassets, 'assets');
+		foreach($this->config['dirs'] as $group => $dir) {
+			$addFilesystemPaths($dir, $group);
 		}
 		
 		$package->setLoaded(true);
@@ -92,36 +78,24 @@ class Loader {
 		return true;
 	}
 	
-	/**
-	 * Whether the package has a /config/routes.php file.
-	 */
-	public function hasRoutes(iPackage $package){
-			
-		return file_exists($package->getPath().$this->routes_file);
-	}
-	
-	/**
-	 * Whether the package has a /config/tables.php file.
-	 */
-	public function hasTables(iPackage $package){
-			
-		return file_exists($package->getPath().$this->tables_file);
-	}
-	
-	/**
-	 * Whether the package has a /Views/ directory.
-	 */
-	public function hasViews(iPackage $package){
-			
-		return is_dir($package->getPath().$this->views_dir);
-	}
-	
-	/**
-	 * Whether the package has a /Public/ directory.
-	 */
-	public function hasAssets(iPackage $package){
+	protected function configure( $config ) {
 		
-		return is_dir($package->getPath().$this->assets_dir);
+		if (isset($config['dirs'])) {
+			$dirs = $config['dirs'];
+		} else {
+			$dirs = $this->default_config['dirs'];
+		}
+		
+		if (isset($config['files'])) {
+			$files = $config['files'];
+		} else {
+			$files = $this->default_config['files'];
+		}
+		
+		$this->config = array(
+			'dirs' => $dirs, 
+			'files' => $files
+		);
 	}
 	
 }

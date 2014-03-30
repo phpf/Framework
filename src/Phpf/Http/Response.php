@@ -38,7 +38,14 @@ class Response {
 	 * @var string
 	 */
 	protected $body;
-
+	
+	/**
+	 * Whether the output buffer has been started.
+	 * Will not start a new one if true, but still calls ob_end_flush()
+	 * @var boolean
+	 */
+	protected $buffer_started;
+	
 	/**
 	 * Whether to gzip the response body.
 	 * @var boolean
@@ -55,7 +62,7 @@ class Response {
 	 * Associative array of permitted content types.
 	 * @var array
 	 */
-	protected $allowed_content_types = array(
+	protected $content_types = array(
 		'html' => 'text/html', 
 		'json' => 'application/json', 
 		'jsonp' => 'text/javascript', 
@@ -67,7 +74,9 @@ class Response {
 	 */
 	public function __construct( Request $request ) {
 
-		if (Request\Headers::acceptEncoding('gzip', $request->headers) && extension_loaded('zlib')) {
+		if (Request\Headers::acceptEncoding('gzip', $request->headers) 
+			&& extension_loaded('zlib')) 
+		{
 			$this->gzip = true;
 		} else {
 			$this->gzip = false;
@@ -79,11 +88,12 @@ class Response {
 			$this->setFrameOptionsHeader('deny');
 		}
 
-		// first try to set content type using parameter
-		if (! isset($request->content_type) || ! $this->maybeSetContentType($request->content_type)) {
-			// set content type using header
-			if ($type = Request\Headers::accept($this->allowed_content_types, $request->headers)) {
-				$this->content_type = $type;
+		// first try to set content type using parameter, then try using header
+		if (! isset($request->content_type) 
+			|| ! $this->maybeSetContentType($request->content_type)) 
+		{
+			if ($type = Request\Headers::accept($this->content_types, $request->headers)) {
+				$this->content_type = array_search($type, $this->content_types);
 			}
 		}
 	}
@@ -92,7 +102,10 @@ class Response {
 	 * Send the response headers and body.
 	 */
 	public function send() {
-
+		
+		header_remove(); // remove all headers
+		
+		// send at least some cache header
 		if (! isset($this->headers['Cache-Control'])) {
 			$this->nocache();
 		}
@@ -107,11 +120,14 @@ class Response {
 		foreach ( $this->headers as $name => $value ) {
 			header(sprintf("%s: %s", $name, $value), true);
 		}
-
+		
 		// Output the body
-		if ( DEBUG || ! $this->gzip || ! ob_start('ob_gzhandler') )
-			ob_start();
-
+			
+		if (! $this->buffer_started) {
+		#	if (! $this->gzip || ! ob_start('ob_gzhandler'))
+				ob_start();
+		}
+		
 		echo $this->body;
 
 		ob_end_flush();
@@ -193,12 +209,20 @@ class Response {
 		$this->content_type = $type;
 		return $this;
 	}
-
+	
 	/**
-	 * Returns true if given response content-type/media type is allowed.
+	 * Sets the buffer as started.
 	 */
-	public function isContentTypeAllowed( $type ) {
-		return isset($this->allowed_content_types[$type]);
+	public function setBufferStarted() {
+		$this->buffer_started = true;
+		return $this;
+	}
+	
+	/**
+	 * Returns true if given response content-type/media type is known.
+	 */
+	public function isKnownContentType( $type ) {
+		return isset($this->content_types[$type]);
 	}
 
 	/**
@@ -206,14 +230,11 @@ class Response {
 	 */
 	public function maybeSetContentType( $type ) {
 
-		if ( $this->isContentTypeAllowed($type) ) {
+		if ($this->isKnownContentType($type)) {
 			$this->setContentType($type);
 			return true;
-		} elseif ( in_array($type, $this->allowed_content_types) ) {
-			$this->setContentType(array_search($type, $this->allowed_content_types));
-			return true;
 		}
-
+		
 		return false;
 	}
 
@@ -221,8 +242,8 @@ class Response {
 	 * Sets a header. Replaces existing by default.
 	 */
 	public function setHeader( $name, $value, $overwrite = true ) {
-
-		if ( $overwrite || ! isset($this->headers[$name]) ) {
+		
+		if ($overwrite || ! isset($this->headers[$name])) {
 			$this->headers[$name] = $value;
 		}
 
@@ -263,16 +284,17 @@ class Response {
 	}
 
 	/**
-	 * Sets the various cache headers.
-	 *
-	 * @param int|bool $expires_offset The offset in seconds to cache. Pass 0 or
-	 * false for no cache.
+	 * Sets the various cache headers. Auto unsets 'Last-Modified'
+	 * if $expires_offset is 0.
+	 * 
+	 * @param int|bool $expires_offset	Time in seconds from now to cache. 
+	 * 									Pass 0 or false for no cache.
 	 */
 	public function setCacheHeaders( $expires_offset = 86400 ) {
 
 		$headers = Http::cacheHeaders($expires_offset);
 
-		if ( empty($expires_offset) ) {
+		if (empty($expires_offset)) {
 			header_remove('Last-Modified');
 			unset($this->headers['Last-Modified']);
 		}
@@ -283,9 +305,9 @@ class Response {
 	}
 
 	/**
-	 * Sets the "X-Frame-Options" header. Default is 'SAMEORIGIN'.
+	 * Sets the "X-Frame-Options" header.
 	 */
-	public function setFrameOptionsHeader( $value = 'SAMEORIGIN' ) {
+	public function setFrameOptionsHeader( $value ) {
 
 		switch($value) {
 			case 'SAMEORIGIN' :
@@ -305,9 +327,9 @@ class Response {
 	}
 
 	/**
-	 * Sets the "X-Content-Type-Options" header. Default is 'nosniff'.
+	 * Sets the "X-Content-Type-Options" header.
 	 */
-	public function setContentTypeOptionsHeader( $value = 'nosniff' ) {
+	public function setContentTypeOptionsHeader( $value ) {
 		return $this->setHeader('X-Content-Type-Options', $value);
 	}
 
@@ -350,10 +372,11 @@ class Response {
 		
 		$code = $this->status;
 		$desc = Http::statusHeaderDesc($code);
+		$protocol = Http::serverProtocol();
 		
-		header(sprintf("%s %d %s", Http::serverProtocol(), $code, $desc), true, $code);
+		header(sprintf("%s %d %s", $protocol, $code, $desc), true, $code);
 		
-		header(sprintf("Status: %d %s", $code, $desc));
+		header(sprintf("Status: %d %s", $code, $desc)); // send extra "Status" header
 		
 		return $this;
 	}
@@ -363,13 +386,13 @@ class Response {
 	 */
 	public function sendContentTypeHeader() {
 
-		if ( isset($this->content_type) && $this->isContentTypeAllowed($this->content_type) ) {
-			$type = $this->allowed_content_types[$this->content_type];
+		if (isset($this->content_type)) {
+			$type = $this->content_types[$this->content_type];
 		} else {
 			$type = self::DEFAULT_CONTENT_TYPE;
 		}
 
-		header(sprintf("Content-Type: %s; charset=%s", $type, $this->getCharset()));
+		header(sprintf("Content-Type: %s; charset=%s", $type, $this->getCharset()), true);
 
 		return $this;
 	}
@@ -395,7 +418,7 @@ class Response {
 	 */
 	protected function objectStr( $object ) {
 
-		if ( method_exists($object, '__toString') ) {
+		if (method_exists($object, '__toString')) {
 			return $object->__toString();
 		}
 

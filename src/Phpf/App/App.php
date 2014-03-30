@@ -9,76 +9,166 @@ use Phpf\Util\iManager;
 
 class App implements ArrayAccess, Countable {
 	
-	public $namespace;
-	
-	public $config;
-	
-	protected $aliaser;
+	const DEFAULT_ID = 'app';
 	
 	protected $components = array();
 	
-	protected static $instance;
+	protected static $instances = array();
 	
 	/**
 	 * Returns object instance.
-	 * If not set, throws RuntimeException
+	 * 
+	 * @throws RuntimeException if no instance with given ID
+	 * @param string $id Application ID
+	 * @return \App
 	 */
-	public static function instance(){
+	public static function instance($id = self::DEFAULT_ID) {
 			
-		if (! isset(static::$instance)) {
+		if (! isset(static::$instances[$id])) {
 			throw new RuntimeException("No application set.");
 		}
 		
-		return static::$instance;
+		return static::$instances[$id];
+	}
+	
+	/**
+	 * Default configuration settings.
+	 * 
+	 * @param array $config User config array.
+	 * @return array Configuration settings.
+	 */
+	public static function configure(array $user_config) {
+			
+		// Merge user config and defaults
+		return $user_config + array(
+			'namespace'	=> 'App',
+			'charset'	=> 'UTF-8',
+			'timezone'	=> 'UTC',
+			'debug' 	=> false,
+			'dirs' => array(
+				'system'	=> 'system',
+				'app'		=> 'app',
+				'library'	=> 'app/library',
+				'module'	=> 'app/modules',
+				'views'		=> 'app/views',
+				'assets'	=> 'app/public',
+				'scripts'	=> 'app/scripts',
+				'resources' => 'app/resources',
+			),
+			'aliases' => array(
+				'App'			=> 'Phpf\App\App',
+				'Config'		=> 'Phpf\Config\Object',
+				'Cache'			=> 'Phpf\Cache\Cache',
+				'Events'		=> 'Phpf\Event\Container',
+				'Request'		=> 'Phpf\Http\Request',
+				'Response'		=> 'Phpf\Http\Response',
+				'Router'		=> 'Phpf\Routes\Router',
+				'Session'		=> 'Phpf\Util\Session',
+				'Registry' 		=> 'Phpf\Util\Registry',
+				'Filesystem'	=> 'Phpf\Filesystem\Filesystem',
+				'Database'		=> 'Phpf\Database\Database',
+			),
+		);
 	}
 	
 	/**
 	 * Create a new application instance.
 	 * 
 	 * @param array|ArrayAccess $config Configuration array/object.
-	 * @return \Application
+	 * @throws RuntimeException If $config is not array or ArrayAccess, or if 
+	 * 							App instance with given ID already exists.
+	 * @return \App
 	 */
-	public static function create( $config ){
+	public static function factory($config) {
 		
-		if (isset(static::$instance)) {
+		if (! is_array($config) && ! $config instanceof ArrayAccess) {
+			throw new RuntimeException("Config must be array or instance of ArrayAccess.");
+		}
+		
+		if (! isset($config['id'])) {
+			$config['id'] = self::DEFAULT_ID;
+		}
+		
+		if (isset(static::$instances[$config['id']])) {
 			throw new RuntimeException('Application already exists.');
 		}
 		
-		if (! is_array($config) && ! $config instanceof ArrayAccess) {
-			throw new RuntimeException("Config must be array of instance of ArrayAccess.");
-		}
-		
 		// create new instance
-		$app = static::$instance = new static();
-		
-		// set config object
-		$app->set('config', new \Phpf\Config\Object($config));
-		
-		// create lazy class aliaser and register (w/ SPL)
-		$app->aliaser = new ClassAliaser;
-		if (isset($config['aliases'])) {
-			$app->aliaser->addAliases($config['aliases']);
-		}
-		$app->aliaser->register();
-		
-		// create package function loader for Phpf namespace
-		$app->functional = new PackageFunctions('Phpf');
-		
-		// util should always be available...
-		if ( $app->loadFunctions('Util') ){
-			// register an autoloader for the app namespace with
-			// basepath as root. The autoloader is PSR-0, so it 
-			// will convert namespace(s) to directories.
-			autoloader_register($app['config']['namespace'], BASEPATH);
-		}
-		
-		return $app;
+		return (static::$instances[$config['id']] = new static($config));
 	}
 	
-	protected function __construct(){}
+	/**
+	 * Construct the application
+	 * 
+	 * @param array|ArrayAccess Config array/object
+	 */
+	protected function __construct($config) {
+		
+		// create class aliaser, add aliases and register
+		$this->set('aliaser', $aliaser = new ClassAliaser);
+		
+		$aliaser->addAliases($config['aliases'])->register();
+				
+		// set Config object
+		$this->set('config', new \Config($config));
+	}
 	
 	/**
-	 * Set a component.
+	 * Returns the application namespace.
+	 * 
+	 * @return string Application namespace
+	 */
+	public function getNamespace() {
+		return $this->get('config')->get('namespace');
+	}
+	
+	/**
+	 * Returns path to given arg or base application path.
+	 * 
+	 * @param null|string $to Name of path to get. Default null
+	 * @return string Path to given arg or base path.
+	 */
+	public function getPath($to = null) {
+		$paths = $this->get('config')->get('paths');
+		if (isset($to)) {
+			return isset($paths[$to]) ? $paths[$to] : null;
+		}
+		return $paths['app'];
+	}
+	
+	/**
+	 * Adds a (lazy) class alias.
+	 * 
+	 * @param string $from Fully resolved class to alias.
+	 * @param string $to The class alias.
+	 * @return $this
+	 */
+	public function alias($from, $to) {
+		$this->aliaser->alias($from, $to);
+		return $this;
+	}
+	
+	/**
+	 * Returns a component.
+	 * 
+	 * @param string $name Component name.
+	 * @return object Component object if exists, otherwise null.
+	 */
+	public function get($name) {
+		
+		if (! isset($this->components[$name]))
+			return null;
+		
+		if (is_object($this->components[$name]))
+			return $this->components[$name];
+		
+		$class = $this->components[$name];
+		
+		return $class::instance();
+	}
+	
+	/**
+	 * Adds a component.
 	 * 
 	 * If $object is a string, the component will be added and 
 	 * called as a singleton.
@@ -87,17 +177,15 @@ class App implements ArrayAccess, Countable {
 	 * @param object|string $object Component object or classname.
 	 * @return $this
 	 */
-	public function set( $name, $object ){
+	public function set($name, $object) {
 		
 		if (is_string($object)) {
 			return $this->setSingleton($name, $object);
 		} 
 		
 		if (! is_object($object)) {
-			trigger_error(
-				'Non-singleton components should be objects - '
-				.gettype($object).' given for '.$name
-			);
+			$type = gettype($object);
+			trigger_error("Non-singleton components must be objects - $type given for $name.");
 			return null;
 		}
 		
@@ -113,16 +201,14 @@ class App implements ArrayAccess, Countable {
 	 * it must have a static instance() method that returns the object.
 	 * 
 	 * @param string $name Case-sensitive component name.
-	 * @param string $class Component singleton class.
+	 * @param string $class Component class implementing singleton.
 	 * @return $this
 	 */
-	public function setSingleton( $name, $class ){
+	public function setSingleton($name, $class) {
 		
 		if (! method_exists($class, 'instance')) {
-			trigger_error(
-				'Classes implementing singleton must have method "instance()" - Class "'
-				.(is_object($class) ? get_class($class) : $class) . '" does not.'
-			);
+			$class = is_object($class) ? get_class($class) : $class;
+			trigger_error("Singletons must have 'instance()' method - Class $class does not.");
 			return null;
 		}
 		
@@ -136,120 +222,28 @@ class App implements ArrayAccess, Countable {
 	}
 	
 	/**
-	 * Returns a component.
-	 * 
-	 * @param string $name Case-sensitive component name.
-	 * @return object Component object if exists, otherwise null.
-	 */
-	public function get( $name ){
-		
-		if (! isset($this->components[$name]))
-			return null;
-		
-		if (is_object($this->components[$name]))
-			return $this->components[$name];
-		
-		$class = $this->components[$name];
-		
-		return $class::instance();
-	}
-	
-	/**
-	 * Sets the application namespace.
-	 * 
-	 * @param string $namespace Case-sensitive application namespace.
-	 * @return $this
-	 */
-	public function setNamespace( $namespace ){
-		$this->namespace = trim($namespace, '\\');
-		return $this;
-	}
-	
-	/**
-	 * Returns the application namespace.
-	 * 
-	 * @return string Application namespace
-	 */
-	public function getNamespace(){
-		return $this->namespace;
-	}
-	
-	/**
-	 * Creates a class alias.
-	 * 
-	 * @param string $from Fully resolved class to alias.
-	 * @param string $to The class alias.
-	 * @return $this
-	 */
-	public function alias( $from, $to ){
-		$this->aliaser->alias($from, $to);
-		return $this;
-	}
-	
-	/**
-	 * Loads functions for a package.
-	 * 
-	 * Package should be in the top-level namespace 
-	 * set in the create() method.
-	 * 
-	 * @param string Package name
-	 * @return boolean Whether functions were loaded.
-	 */
-	public function loadFunctions( $package ){
-		return $this->functional->load($package);
-	}
-	
-	/**
-	 * Returns true if functions are loaded for a package,
-	 * otherwise returns false.
-	 * 
-	 * @param string Package name
-	 * @return boolean True if functions loaded, otherwise false.
-	 */
-	public function functionsLoaded( $package ){
-		return $this->functional->loaded($package);
-	}
-	
-	/**
-	 * Shortcut method combining the two above.
-	 */
-	public function functions( $package ){
-			
-		if (! $this->functionsLoaded($package)) {
-			return $this->loadFunctions($package);
-		}
-		
-		return true;
-	}
-	
-	/**
 	 * Sets cache driver based on config values, or lack thereof.
+	 * 
+	 * @param string $cache Classname to use for Cache (singleton).
 	 * @return \Cache
 	 */
-	public function startCache(){
+	public function startCache($cache) {
 		
-		if (! $cache = $this->get('cache')) {
-			throw new RuntimeException("Cache not set.");
+		$this->setSingleton('cache', $cache); // set the class
+		$cache = $this->get('cache'); // get the object
+		$conf = $this->get('config')->get('cache');
+		
+		// get driver class
+		if (isset($conf['driver-class'])) {
+			$class = $conf['driver-class'];
+		} elseif (isset($conf['driver'])) {
+			$class = 'Phpf\\Cache\\Driver\\'.ucfirst($conf['driver']).'Driver';
 		}
 		
-		$config = $this->get('config');	
-		$cacheConf = $config['cache'];
-		
-		// set cache driver if not exists
-		if (! isset($cacheConf['driver'])) {
-			$cacheConf['driver'] = 'static';	
-			$cacheConf['driver-class'] = 'StaticDriver';
-		}
-		
-		if (isset($cacheConf['driver-class'])) {
-			$cacheClass = $cacheConf['driver-class'];
+		if (isset($class) && class_exists($class, true)) {
+			$cache->setDriver(new $class);
 		} else {
-			$cacheClass = 'Phpf\\Cache\\Driver\\'.ucfirst($cacheConf['driver']).'Driver';
-		}
-		
-		if (class_exists($cacheClass)) {
-			$cache->setDriver(new $cacheClass);
-		} else {
+			// set fallback driver
 			$cache->setDriver(new \Phpf\Cache\Driver\StaticDriver);
 		}
 		
@@ -257,10 +251,10 @@ class App implements ArrayAccess, Countable {
 	}
 	
 	/**
-	 * Route the current request.
+	 * Countable
 	 */
-	public function routeRequest(){
-		return $this->get('router')->dispatch($this['request'], $this['response']);
+	public function count(){
+		return count($this->components);
 	}
 	
 	/**
@@ -281,21 +275,42 @@ class App implements ArrayAccess, Countable {
 	 * ArrayAccess
 	 */
 	public function offsetUnset( $index ){
-		trigger_error('Cannot unset application components.');
+		trigger_error('Cannot unset application components.', E_USER_NOTICE);
 	}
 	
 	/**
 	 * ArrayAccess
 	 */
 	public function offsetExists( $index ){
-		return array_key_exists($index, $this->components);
+		return isset($this->components[$var]);
 	}
 	
 	/**
-	 * Countable
+	 * Magic __get()
 	 */
-	public function count(){
-		return count($this->components);
+	public function __get($var) {
+		return $this->get($var);
+	}
+	
+	/**
+	 * Magic __set()
+	 */
+	public function __set($var, $val) {
+		$this->set($var, $val);
+	}
+	
+	/**
+	 * Magic __isset()
+	 */
+	public function __isset($var) {
+		return isset($this->components[$var]);
+	}
+	
+	/**
+	 * Magic __unset()
+	 */
+	public function __unset($var) {
+		$this->offsetUnset($var);
 	}
 	
 	/**

@@ -34,7 +34,7 @@ namespace {
 			
 		$al = \Phpf\Util\Autoloader::instance($namespace, rtrim($path, '/\\'));
 		
-		if ( !$al->isRegistered() ){
+		if (! $al->isRegistered()) {
 			$al->register();
 		}
 	}
@@ -46,39 +46,32 @@ namespace {
 	/**
 	 * Registers an object with Registry.
 	 */
-	function register( $key, $object ){
+	function register($key, $object) {
 		\Phpf\Util\Registry::set($key, $object);
 	}
 	
 	/**
 	 * Returns an object from Registry given its key.
 	 */
-	function registry( $key ){
+	function registry($key) {
 		return \Phpf\Util\Registry::get($key);
 	}
 	
 	/** ======================
 	 		Session
 	 ====================== */
-	
-	/**
-	 * Returns the session instance.
-	 */
-	function session(){
-		return \Phpf\Util\Session::instance();
-	}
-	
+		
 	/**
 	 * Sets a session variable.
 	 */
-	function session_set( $var, $val ){
+	function session_set($var, $val) {
 		return \Phpf\Util\Session::instance()->set($var, $val);
 	}
 	
 	/**
 	 * Returns a session variable.
 	 */
-	function session_get( $var = '' ){
+	function session_get($var) {
 		return \Phpf\Util\Session::instance()->get($var);	
 	}	
 		
@@ -97,7 +90,7 @@ namespace {
 	 * @param array &$glob The glob of flattend paths.
 	 * @return array Flattened assoc. array of filepaths.
 	 */
-	function glob_deep( $dir, $levels = 10, array &$glob = array(), $level = 1 ){
+	function glob_deep($dir, $levels = 10, array &$glob = array(), $level = 1) {
 	
 		$dir = \Phpf\Util\Path::normalize($dir);
 		
@@ -124,7 +117,7 @@ namespace {
 	 * @param int $levels Max directory depth level.
 	 * @return array Multi-dimensional array of files and directories.
 	 */
-	function scan( $dir, $recursive = false, $levels = 10 ){
+	function scan($dir, $recursive = false, $levels = 10) {
 		
 		$dir = \Phpf\Util\Path::normalize($dir) . '/';
 		$recursive = (int) $recursive;
@@ -132,9 +125,9 @@ namespace {
 		
 		foreach( scandir($dir) as $item ) {
 			
-			if ( '.' !== $item && '..' !== $item ){
+			if ('.' !== $item && '..' !== $item) {
 				
-				if ( is_dir($dir.$item) && 0 <> $recursive <= $levels ){
+				if (is_dir($dir.$item) && 0 <> $recursive <= $levels) {
 					$recursive++;
 					$dirs[ $item ] = scan($dir.$item, $recursive, $levels);
 				} else {
@@ -153,15 +146,15 @@ namespace {
 	 * @param array &$all_dirs The flattened filesystem array.
 	 * @return array The flattened filesystem array.
 	 */
-	function flatten_scan( $dirs, array &$all_dirs = array(), $strip_pre = '' ){
+	function flatten_scan($dirs, array &$all_dirs = array(), $strip_pre = '') {
 		
 		$pre = empty($strip_pre) ? '' : \Phpf\Util\Path::normalize($strip_pre);
 		
-		foreach($dirs as $item){
-			if ( is_array($item) ){
+		foreach( $dirs as $item ) {
+			if (is_array($item)) {
 				flatten_scan($item, $all_dirs, $pre);
 			} else {
-				$all_dirs[ str_replace($pre, '', $item) ] = $item;
+				$all_dirs[str_replace($pre, '', $item)] = $item;
 			}
 		}
 		
@@ -180,7 +173,7 @@ namespace {
 	 * @param bool $encode Whether to encode or strip high & low ASCII chars. (default: false = strip)
 	 * @return string Sanitized string.
 	 */
-	function str_esc( $string, $flag = Str::ESC_STRIP ){
+	function str_esc($string, $flag = Str::ESC_ASCII) {
 		return Str::esc($string, $flag);
 	}
 	
@@ -189,7 +182,7 @@ namespace {
 	 * Add characters to $extras to preserve those as well.
 	 * Extra chars should be escaped for use in preg_*() functions.
 	 */
-	function str_esc_alnum( $str, array $extras = null ){
+	function str_esc_alnum($str, array $extras = null) {
 		return Str::escAlnum($str, $extras);
 	}
 	
@@ -199,7 +192,7 @@ namespace {
 	 * @param string $text The text to be escaped.
 	 * @return string text, safe for inclusion in LIKE query.
 	 */
-	function str_esc_sql_like( $string ) {
+	function str_esc_sql_like($string) {
 		return Str::escSqlLike($string);
 	}
 	
@@ -218,7 +211,7 @@ namespace {
 	 * @param string $template String format to apply
 	 * @return string Formatted string.
 	 */
-	function str_format( $string, $template ){
+	function str_format($string, $template) {
 		return Str::format($string, $template);
 	}
 	
@@ -229,21 +222,21 @@ namespace {
 	* @param string $type The type of characters to use to generate string.
 	* @return string A random string
 	*/
-	function str_rand( $length = 16, $pool_type = 'alnum' ){
+	function str_rand($length = 16, $pool_type = 'alnum') {
 		return Str::rand($length, $pool_type);
 	}
 	
 	/**
 	 * Converts a string to a PEAR-like class name. (e.g. "View_Template_Controller")
 	 */
-	function str_pearclass( $str ){
+	function str_pearclass($str) {
 		return Str::pearClass($str);
 	}
 	
 	/**
 	 * Converts a string to "snake_case"
 	 */
-	function str_snakecase( $str ){
+	function str_snakecase($str) {
 		return Str::snakeCase($str);
 	}
 	
@@ -257,21 +250,21 @@ namespace {
 	/**
 	 * Converts a string to "camelCase"
 	 */
-	function str_camelcase( $str ){
+	function str_camelcase($str) {
 		return Str::camelCase($str);
 	}
 	
 	/**
 	 * Formats a phone number based on string lenth.
 	 */
-	function phone_format( $phone ){
+	function phone_format($phone) {
 		return Str::formatPhone($phone);
 	}
 	
 	/**
 	 * Formats a hash/digest based on string length.
 	 */
-	function hash_format( $hash ){
+	function hash_format($hash) {
 		return Str::formatHash($hash);
 	}
 	
@@ -281,7 +274,7 @@ namespace {
 	 * @param mixed $data Data that might be serialized.
 	 * @return mixed A scalar data
 	 */
-	function maybe_serialize( $data ) {
+	function maybe_serialize($data) {
 		return Str::maybeSerialize($data);
 	}
 	
@@ -291,7 +284,7 @@ namespace {
 	 * @param string $value Maybe unserialized original, if is needed.
 	 * @return mixed Unserialized data can be any type.
 	 */
-	function maybe_unserialize( $value ) {
+	function maybe_unserialize($value) {
 		return Str::maybeUnserialize($value);
 	}
 	
@@ -302,8 +295,41 @@ namespace {
 	 * @param bool $strict Optional. Whether to be strict about the end of the string. Defaults true.
 	 * @return bool False if not serialized and true if it was.
 	 */
-	function is_serialized( $data, $strict = true ) {
+	function is_serialized($data, $strict = true) {
 		return Str::isSerialized($data, $strict);
+	}
+	
+	/** ====================
+			Paths
+	===================== */
+	
+	/**
+	 * Url-safe Base64 encode.
+	 */
+	function base64_encode_urlsafe($str) {
+		return \Phpf\Util\Path::safeBase64Encode($str);
+	}
+	
+	/**
+	 * Url-safe Base64 decode.
+	 */
+	function base64_decode_urlsafe($str) {
+		return \Phpf\Util\Path::safeBase64Decode($str);
+	}
+	
+	/**
+	 * Converts a path to URL
+	 */
+	function path_url($path, $protocol = 'http') {
+		return \Phpf\Util\Path::url($path, $protocol);
+	}
+	
+	/**
+	 * Normalizes a path by converting backslashes to forward slashes.
+	 */
+	function normalize_path($path, $trailingslash = false) {
+		$path = rtrim(str_replace('\\', '/', $path), '/');
+		return $trailingslash ? $path . '/' : $path;
 	}
 	
 	/** ====================
@@ -317,21 +343,21 @@ namespace {
 	 * 		mcrypt_create_iv() PHP >= 5.3.7
 	 * 		/dev/urandom
 	 */
-	function rand_bytes( $length = 12, $strong = true ){
+	function rand_bytes($length = 12, $strong = true) {
 		return \Phpf\Util\Security::randBytes($length, $strong);
 	}
 	
 	/**
 	 * Generates a verifiable token from seed.
 	 */
-	function generate_token( $seed, $algo = \Phpf\Util\Security::DEFAULT_HASH_ALGO ){
+	function generate_token($seed, $algo = \Phpf\Util\Security::DEFAULT_HASH_ALGO) {
 		return \Phpf\Util\Security::generateToken($seed, $algo);
 	}
 	
 	/**
 	 * Verifies a token using seed.
 	 */
-	function verify_token( $token, $seed, $algo = \Phpf\Util\Security::DEFAULT_HASH_ALGO ){
+	function verify_token($token, $seed, $algo = \Phpf\Util\Security::DEFAULT_HASH_ALGO) {
 		return \Phpf\Util\Security::verifyToken($token, $seed, $algo);
 	}
 	
@@ -357,14 +383,14 @@ namespace {
 	/**
 	* Retrieves a value from $array given its path in dot notation
 	*/
-	function array_get( array &$array, $dotpath ) {
+	function array_get(array &$array, $dotpath) {
 		return \Phpf\Util\Arr::dotGet($array, $dotpath);
 	}
 	
 	/**
 	* Sets a value in $array given its path in dot notation.
 	*/
-	function array_set( array &$array, $dotpath, $value ){
+	function array_set(array &$array, $dotpath, $value){
 		return \Phpf\Util\Arr::dotSet($array, $dotpath, $value);
 	}
 	
@@ -375,7 +401,7 @@ namespace {
 	 * @param array $defaults Array that serves as the defaults.
 	 * @return array Merged user defined values with defaults.
 	 */
-	function parse_args( $args, $defaults = '' ) {
+	function parse_args($args, $defaults = '') {
 		return \Phpf\Util\Arr::parse($args, $defaults);
 	}
 	
@@ -391,7 +417,7 @@ namespace {
 	 *   The default is 'AND'.
 	 * @return array
 	 */
-	function list_filter( $list, $args = array(), $operator = 'AND', $keys_exist_only = false ) {
+	function list_filter($list, $args = array(), $operator = 'AND', $keys_exist_only = false) {
 		return \Phpf\Util\Arr::filter($list, $args, $operator, $keys_exist_only);
 	}
 	
@@ -402,7 +428,7 @@ namespace {
 	 * @param int|string $field A field from the object to place instead of the entire object
 	 * @return array
 	 */
-	function list_pluck( $list, $field ) {
+	function list_pluck($list, $field) {
 		return \Phpf\Util\Arr::pluck($list, $field);
 	}
 	
@@ -414,7 +440,7 @@ namespace {
 	 * @param int|string $field A field from the object to place instead of the entire object
 	 * @return array
 	 */
-	function list_pluck_ref( &$list, $field ){
+	function list_pluck_ref(&$list, $field){
 		return \Phpf\Util\Arr::pluckRef($list, $field);
 	}
 		

@@ -22,7 +22,7 @@ class Callback {
 	
 	public function __construct( $callable ){
 		
-		if ( !is_callable($callable) ){
+		if (! is_callable($callable)) {
 			throw new Exception\Uncallable("Uncallable function/method passed to Phpf\Util\Reflection\Callback.");
 		}
 		

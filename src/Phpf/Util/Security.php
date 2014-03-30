@@ -19,14 +19,14 @@ class Security {
 	/**
 	 * Generates a verifiable token from seed.
 	 */
-	public static function generateToken( $seed, $algo = self::DEFAULT_HASH_ALGO ){
+	public static function generateToken($seed, $algo = self::DEFAULT_HASH_ALGO) {
 		return hash_hmac($algo, $seed, self::getHashKey());
 	}
 	
 	/**
 	 * Verifies a token using seed.
 	 */
-	public static function verifyToken( $token, $seed, $algo = self::DEFAULT_HASH_ALGO ){
+	public static function verifyToken($token, $seed, $algo = self::DEFAULT_HASH_ALGO) {
 		return $token === self::generateToken($seed, $algo);
 	}
 	
@@ -37,14 +37,13 @@ class Security {
 	 */
 	public static function generateUuid(){
 		$bytes = self::randBytes(16, false);
-		$hex = bin2hex($bytes);
-		return Str::formatHash($hex);
+		return Str::formatHash(bin2hex($bytes));
 	}
 	
 	/**
 	 * Generates a 32-char base64-encoded random string.
 	 */
-	public static function generateCrsfToken(){
+	public static function generateCsrfToken(){
 	    return base64_encode(self::generateUuid());
 	}
 		

@@ -5,34 +5,113 @@ namespace Phpf\Util\Dependency;
 use Exception;
 use Closure;
 
-class Container {
+class Resource {
 	
-	protected $closures;
+	protected $class;
+	
+	protected $resource;
+	
+	public function __construct($resource) {
+		$this->resource = $resource;
+	}
+	
+	public function __invoke( array $args = array() ) {
+		
+		if (is_callable($this->resource)) {
+			
+			$refl = new \Phpf\Util\Reflection\Callback($this->resource);
+			
+			try {
+				$refl->reflectParameters($args);
+			} catch (\Phpf\Util\Reflection\Exception\MissingParam $e) {
+				throw new \RuntimeException("Cannot get dependency - missing param {$e->__toString()}.");
+			}
+			
+			return $refl->invoke();
+		
+		}
+	}
+	
+}
+
+class Factory extends Resource {
+	
+	public function __invoke( array $args = array() ) {
+		
+		return call_user_func_array($this->resource, $args);
+	}
+	
+}
+
+class Container {
 	
 	protected $objects;
 	
-	protected $singletons;
+	protected $factories;
 	
-	protected $singletonIds;
+	protected $resources;
 	
-	protected static $_instance;
-	
-	public static function i(){
-		if ( ! isset(self::$_instance) )
-			self::$_instance = new self();
-		return self::$_instance;
+	public function __construct(){
+		$this->objects = array();
+		$this->factories = array();
+		$this->resources = array();
 	}
 	
-	protected function __construct(){
-		$this->closures = array();
-		$this->objects = array();
-		$this->singletons = array();
-		$this->singletonIds = array();
+	public function register($name, $resource) {
+		
+		if (! $resource instanceof Resource) {
+			$resource = new Resource($resource);
+		}
+		
+		$this->resources[$name] = $resource;
+		
+		return $this;
+	}
+	
+	public function inject($name, $object) {
+		
+		if (! is_object($object)) {
+			trigger_error('Must pass object as second parameter to inject() - '. gettype($object) .' given.');
+			return null;
+		}
+		
+		$this->objects[$name] = $object;
+		
+		return $this;
+	}
+	
+	public function factory($name, \Closure $callback) {
+		$this->factories[$name] = $callback;
+		return $this;
+	}
+	
+	public function resolve($resource, array $args = array()) {
+		
+		if (isset($this->objects[$resource])) {
+			return $this->objects[$resource];
+		}
+		
+		if (isset($this->resources[$resource])) {
+			$res = $this->resources[$resource];
+			return $res($args);
+		}
+		
+		if (isset($this->factories[$resource])) {
+			$factory = $this->factories[$resource];
+			return $factory($args);
+		}
+		
+		if (class_exists($resource, true)) {
+			return new $resource($args);
+		}
+		
+		trigger_error("Could not resolve dependency $resource.");
+		return null;
 	}
 	
 	public function set( $id, $value, $asSingleton = false ){
 		
-		if ( !is_object($value) ){
+		if (! is_object($value)) {
 			throw new Exception("Must pass closure or object as value to set() - " . gettype($value) . " given.");
 		}
 		

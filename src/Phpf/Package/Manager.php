@@ -3,8 +3,7 @@
 namespace Phpf\Package;
 
 use Phpf\Util\iManager;
-use Phpf\Filesystem\Filesystem;
-use Phpf\Event\Container as Events;
+use Phpf\App\App;
 
 class Manager implements iManager {
 	
@@ -16,9 +15,9 @@ class Manager implements iManager {
 	
 	protected $loader;
 	
-	protected $events;
-	
 	protected $config;
+	
+	protected $functional = array();
 	
 	protected $paths = array();
 	
@@ -27,15 +26,27 @@ class Manager implements iManager {
 	/**
 	 * Constructor
 	 */
-	public function __construct( Filesystem $filesystem, Events &$events, array $config ){
+	public function __construct( App $app ){
+		
+		$this->app = $app;
+		
+		$this->loader = new Loader($app);
+		
+		$this->config = $app->get('config')->get('packages');
+	}
+	
+	public function init() {
+		
+		if (! empty($this->config['functions'])) {
 			
-		$this->loader = new Loader($filesystem);
-		$this->events =& $events;
-		
-		$this->config = $config;
-		
-		if (isset($config['paths'])) {
-			$this->paths = $config['paths'];
+			foreach($this->config['functions'] as $namespace => $packages) {
+					
+				$this->initFunctions($namespace);
+				
+				array_walk($packages, function ($package) use($namespace) {
+					$this->loadFunctions($namespace, $package);
+				});
+			}
 		}
 		
 		if (! empty($this->config['preload'])) {
@@ -49,31 +60,45 @@ class Manager implements iManager {
 		if (! empty($this->config['conditional'])) {
 			$this->parseConditionalPackages($this->config['conditional']);
 		}
+	}
+	
+	public function setClass( $package_type, $class ) {
+		$this->classes[$package_type] = $class;
+		return $this;
+	}
+	
+	public function getClass($package_type){
+			
+		if (isset($this->classes[$package_type])) {
+			return $this->classes[$package_type];
+		}
 		
+		$const = 'DEFAULT_'.strtoupper($package_type).'_CLASS';
+		
+		if (defined("static::$const")) {
+			return constant("static::$const");
+		}
+		
+		trigger_error("No class set for package type $package_type.");
 	}
 	
-	public function setLibraryClass( $class ) {
-		$this->classes['library'] = $class;
+	public function setPath($package_type, $path) {
+		$this->paths[$package_type] = rtrim($path, '/\\') . '/';
 		return $this;
 	}
 	
-	public function setModuleClass( $class ) {
-		$this->classes['module'] = $class;
-		return $this;
-	}
-	
-	public function getLibraryClass(){
-		if (isset($this->classes['library'])) {
-			return $this->classes['library'];
+	public function getPath($package_type) {
+			
+		if (isset($this->paths[$package_type]))
+			return $this->paths[$package_type];
+		
+		$paths = $this->app->get('config')->get('paths');
+		
+		if ($path = $paths[$package_type]) {
+			return $path;
 		}
-		return self::DEFAULT_LIBRARY_CLASS;
-	}
-	
-	public function getModuleClass(){
-		if (isset($this->classes['module'])) {
-			return $this->classes['module'];
-		}
-		return self::DEFAULT_MODULE_CLASS;
+		
+		trigger_error("No path set for package type $package_type.");
 	}
 	
 	/**
@@ -126,17 +151,19 @@ class Manager implements iManager {
 	/**
 	 * Adds a module by name.
 	 */
-	public function addModule( $mod ) {
-		$modClass = $this->getModuleClass();
-		$this->add(new $modClass($mod, MODULES.ucfirst($mod)));
+	public function addModuleByName( $mod ) {
+		$modClass = $this->getClass('module');
+		$dirpath = $this->getPath('module');
+		$this->add(new $modClass($mod, rtrim($dirpath, '/\\').'/'.ucfirst($mod)));
 	}
 	
 	/**
 	 * Adds a library by name.
 	 */
-	public function addLibrary( $lib ) {
-		$libClass = $this->getLibraryClass();
-		$this->add(new $libClass($lib, LIBRARY.ucfirst($lib)));
+	public function addLibraryByName( $lib ) {
+		$libClass = $this->getClass('library');
+		$dirpath = $this->getPath('library');
+		$this->add(new $libClass($lib, rtrim($dirpath, '/\\').'/'.ucfirst($lib)));
 	}
 	
 	/**
@@ -144,29 +171,21 @@ class Manager implements iManager {
 	 */
 	public function addPackages( array $packages, $load = false ) {
 			
-		foreach($packages as $package) {
-			
+		array_walk($packages, function ($package) use ($load) {
 			if (0 === strpos($package, 'library.')) {
-			
 				$lib = substr($package, 8);
-			
-				$this->addLibrary($lib);
-				
+				$this->addLibraryByName($lib);
 				if ($load) {
 					$this->load('library.'.$lib);
 				}
-			
 			} elseif (0 === strpos($package, 'module.')) {
-					
 				$mod = substr($package, 7);
-			
-				$this->addModule($mod);
-				
+				$this->addModuleByName($mod);
 				if ($load) {
 					$this->load('module.'.$mod);
 				}
 			}
-		}
+		});
 	}
 	
 	/**
@@ -192,13 +211,13 @@ class Manager implements iManager {
 			throw new Exception\Invalid("Invalid package - packages must implement Phpf\Package\iPackage.");
 		}
 		
-		if ($package->isLoaded()){
+		if ($package->isLoaded()) {
 			throw new Exception\Loaded(ucfirst($package->getType())." '$package->getId()' is already loaded.");
 		}
 		
 		$this->loader->load($package);
 		
-		$this->events->trigger($package->getUid().'.load', $package);
+		$this->app->get('events')->trigger($package->getUid().'.load', $package);
 			
 		return $this;
 	}
@@ -210,7 +229,7 @@ class Manager implements iManager {
 		
 		$pkg = $this->get($uid);
 		
-		if (empty($pkg) || ! $pkg instanceof iPackage){
+		if (empty($pkg) || ! $pkg instanceof iPackage) {
 			return false;
 		}
 		
@@ -218,43 +237,66 @@ class Manager implements iManager {
 	}
 	
 	/**
-	 * Returns all package objects of given type.
+	 * Sets up functions control for namespace
 	 */
-	public function getAllOfType( $type ){
-		return empty($this->packages[$type]) ? array() : $this->packages[$type];
+	public function initFunctions($namespace){
+		$this->functional[$namespace] = new Functions($namespace);
+		return $this;
+	}
+	
+	/**
+	 * Loads functions for a package.
+	 *  
+	 * @param string Package name
+	 * @return boolean Whether functions were loaded.
+	 */
+	public function loadFunctions( $namespace, $package ){
+		
+		if (! isset($this->functional[$namespace])) {
+			throw new \RuntimeException("Functions object for namespace $namespace is not set.");
+		}
+		
+		return $this->functional[$namespace]->load($package);
+	}
+	
+	
+	/**
+	 * Returns true if functions are loaded for a package,
+	 * otherwise returns false.
+	 * 
+	 * @param string Package name
+	 * @return boolean True if functions loaded, otherwise false.
+	 */
+	public function functionsLoaded( $namespace, $package ){
+		
+		if (! isset($this->functional[$namespace])) {
+			throw new \RuntimeException("Functions object for namespace $namespace is not set.");
+		}
+		
+		return $this->functional[$namespace]->loaded($package);
 	}
 	
 	/**
 	 * Loads all packages of given type.
-	 * If package is already loaded, no error is reported.
 	 */
 	public function loadAllOfType( $type ){
 		
 		$all = $this->getAllOfType($type);
 		
-		if ( ! empty($all) ){
-			foreach($all as $pkg){
+		if (! empty($all)){
+			array_walk($all, function (&$pkg) {
 				$this->load($pkg);
-			}
+			});
 		}
 		
 		return $this;
 	}
 	
 	/**
-	 * Returns indexed array of all package UIDs.
+	 * Returns all package objects of given type.
 	 */
-	public function getUids(){
-		
-		$uids = array();
-		
-		if ( ! empty($this->packages) ) {
-			foreach( $this->packages as $pkg ) {
-				$uids[] = $pkg->getUid();
-			}
-		}
-		
-		return $uids;
+	public function getAllOfType( $type ){
+		return empty($this->packages[$type]) ? array() : $this->packages[$type];
 	}
 	
 	/**
@@ -275,7 +317,7 @@ class Manager implements iManager {
 			
 			foreach($operators as $op) {
 				if (false !== $pos = strpos($str, $op)) {
-					$value = substr($str, $pos+strlen($pos));
+					$value = substr($str, $pos+strlen($op));
 					return $op;
 				}
 			}
@@ -286,6 +328,10 @@ class Manager implements iManager {
 			
 			$val = '';
 			$oper = $findDelim($condition, $val);
+			
+			if (is_null($oper)) {
+				continue;
+			}
 			
 			switch(strtoupper(substr($condition, 0, 3))) {
 				
@@ -315,8 +361,8 @@ class Manager implements iManager {
 	}
 	
 	/**
-	 * Creates a new array with 'type' and 'id' keys.
-	 * 
+	 * used with list($type, $id)
+	 *  
 	 * @param array $args	Arguments.	If only 1 element is present, it(the string) is parsed 
 	 * 									as a dot-separated type/ID pair. Otherwise, the first
 	 * 									two items will be used as the type and ID, respectively.

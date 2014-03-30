@@ -10,13 +10,6 @@ namespace Phpf\Database {
 namespace {
 	
 	use Phpf\Database\Database;
-		
-	/**
-	 * Returns the database instance
-	 */
-	function database(){
-		return Database::instance();	
-	}
 	
 	/**
 	 * Creates and registers a database table schema.
@@ -37,7 +30,6 @@ namespace {
 		
 		if ( isset($unique_keys) ){
 			foreach($unique_keys as $idx => $key){
-				
 				if (is_numeric($idx)){
 					$schema['unique_keys'][$key] = $key;
 				} else {
@@ -48,7 +40,6 @@ namespace {
 		
 		if ( isset($keys) ){
 			foreach($keys as $idx => $key){
-				
 				if (is_numeric($idx)){
 					$schema['keys'][$key] = $key;
 				} else {
@@ -57,14 +48,14 @@ namespace {
 			}
 		}
 		
-		\Database::instance()->registerSchema(new \Phpf\Database\Table\Schema($schema));
+		Database::instance()->registerSchema(new \Phpf\Database\Table\Schema($schema));
 	}
 			
 	/**
 	 * Creates and registers a table schema.
 	 */
 	function db_register_schema( array $data ){
-		if ( $schema = new \Phpf\Database\Table\Schema($data) ){
+		if ($schema = new \Phpf\Database\Table\Schema($data)) {
 			Database::instance()->registerSchema($schema);
 			return true;
 		}
@@ -106,7 +97,7 @@ namespace {
 		
 		$db = Database::instance();
 		
-		if ( $db->isTableInstalled($table) )
+		if ($db->isTableInstalled($table))
 			return 2;
 		
 		$schema = $db->schema($table);
@@ -125,7 +116,7 @@ namespace {
 		
 		$db = Database::instance();
 		
-		if ( ! $db->isTableInstalled($table) )
+		if (! $db->isTableInstalled($table))
 			return 2;
 	
 		$schema = $db->schema($table);
