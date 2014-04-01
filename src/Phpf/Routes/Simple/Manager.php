@@ -8,8 +8,6 @@ class Manager {
 	
 	const DEFAULT_XML_CLASS = 'XmlElement';
 	
-	protected $xml;
-	
 	protected $parameters = array();
 	
 	protected $endpoints = array();
@@ -21,21 +19,39 @@ class Manager {
 			return simplexml_load_string($str_or_file, $class_name);
 		}
 	}
+	
+	public static function getCached($cache) {
+		if ($cache->exists('simple-routes', 'simple-routes')) {
+			$data = $cache->get('simple-routes', 'simple-routes');
+			return id(new static)->import($data);
+		}
+		return null;
+	}
 		
-	public static function newFromXml(SimpleXMLElement $xml) {
+	public static function newFromXml(SimpleXMLElement $xml, $cache = null) {
 		
 		$_this = new static();
-		$_this->xml = $xml;
 		
-		foreach($_this->xml->parameter as $param) {
+		foreach($xml->parameter as $param) {
 			$_this->parameters[$param->getAttribute('name')] = Parameter::newFromXml($param);
 		}
 		
-		foreach($_this->xml->endpoint as $ep) {
+		foreach($xml->endpoint as $ep) {
 			$_this->endpoints[$ep->getAttribute('name')] = Endpoint::newFromXml($ep);
 		}
 		
+		if (isset($cache)) {
+			$cache->set('simple-routes', serialize($_this), 'simple-routes');
+		}
+		
 		return $_this;
+	}
+	
+	public function import($data) {
+		foreach($data as $key => $value) {
+			$this->$key = $value;
+		}
+		return $this;
 	}
 	
 	public function getParameter($name) {
@@ -44,6 +60,17 @@ class Manager {
 	
 	public function getEndpoint($name) {
 		return isset($this->endpoints[$name]) ? $this->endpoints[$name] : null;
+	}
+	
+	public function serialize() {
+		return serialize(array(
+			'parameters' => $this->parameters,
+			'endpoints' => $this->endpoints,
+		));
+	}
+	
+	public function unserialize($serialized) {
+		$this->import(unserialize($serialized));
 	}
 	
 }

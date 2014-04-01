@@ -28,8 +28,6 @@ class Route {
 		foreach(array('path', 'action', 'methods') as $attr) {
 			if ($val = $xml->getAttribute($attr)) {
 				$data[$attr] = $val;
-			} elseif (isset($endpoint)) {
-				$data[$attr] = $endpoint->getDefault($attr);
 			}
 		}
 		
@@ -38,7 +36,18 @@ class Route {
 	
 	public function setEndpoint(Endpoint &$endpoint) {
 		$this->endpoint =& $endpoint;
+		if (empty($this->methods)) {
+			$this->methods = $this->endpoint->getDefault('methods');
+		}
 		return $this;
+	}
+	
+	public function getController() {
+		if (isset($this->controller)) {
+			return $this->controller;
+		} elseif (isset($this->endpoint)) {
+			return $this->endpoint->getController();
+		}
 	}
 	
 	public function getPath(){

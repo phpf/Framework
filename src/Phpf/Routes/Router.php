@@ -60,11 +60,15 @@ class Router implements iEventable
 	 */
 	public function dispatch(Request &$request, Response &$response) {
 
+		timer_start('router');
+		
 		$this->request = &$request;
 		$this->response = &$response;
-
+		
 		if ($this->match()) {
-
+			
+			timer_end('router');
+			
 			$reflect = new Callback($this->route->getCallback());
 			$this->trigger('dispatch:before', $this->route, $this->request, $this->response);
 
@@ -398,7 +402,7 @@ class Router implements iEventable
 		// find vars either renamed or inline
 		if (preg_match_all('/<(\w+):(.+?)>/', $uri, $matches)) {
 			
-			// easier to use full match vs re-creating the pattern
+			// easier to use full match for str_replace() vs re-creating the pattern
 			foreach ( $matches[0] as $i => $str ) {
 
 				if ('' !== $regex = $this->getRegex($matches[2][$i])) {

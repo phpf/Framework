@@ -10,6 +10,8 @@ class Router {
 	
 	protected $manager;
 	
+	protected $matches = array();
+	
 	public function __construct(Manager $manager) {
 		$this->manager = $manager;
 	}
@@ -74,6 +76,10 @@ class Router {
 		$this->endTimer();
 		
 		return false;	
+	}
+
+	public function getMatches() {
+		return $this->matches;
 	}
 
 	protected function endTimer() {

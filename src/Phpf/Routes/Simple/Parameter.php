@@ -10,8 +10,14 @@ class Parameter {
 	
 	const NUM = '0123456789';
 	
+	protected $allowed_chars;
+	
 	protected static $attribute_keys = array(
-		'name', 'chars', 'min-length', 'max-length', 'case-sensitive'
+		'name', 
+		'chars', 
+		'min-length', 
+		'max-length', 
+		'case-sensitive'
 	);
 	
 	public function __construct(array $data) {
@@ -64,6 +70,10 @@ class Parameter {
 		return false;
 	}
 	
+	/**
+	 * Builds a string of allowed characters to use later in strspn()
+	 * $allowed_chars is set with the charlist.
+	 */
 	protected function determineAllowedChars() {
 		$chars = '';
 		

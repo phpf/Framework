@@ -62,6 +62,10 @@ class Endpoint {
 		return null;
 	}
 	
+	public function getController() {
+		return $this->controller;
+	}
+	
 	public function getRoutes() {
 		return $this->routes;
 	}

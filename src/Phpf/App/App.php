@@ -40,7 +40,7 @@ class App implements ArrayAccess, Countable {
 	public static function configure(array $user_config) {
 			
 		// Merge user config and defaults
-		return $user_config + array(
+		return array_replace_recursive(array(
 			'namespace'	=> 'App',
 			'charset'	=> 'UTF-8',
 			'timezone'	=> 'UTC',
@@ -68,7 +68,7 @@ class App implements ArrayAccess, Countable {
 				'Filesystem'	=> 'Phpf\Filesystem\Filesystem',
 				'Database'		=> 'Phpf\Database\Database',
 			),
-		);
+		), $user_config);
 	}
 	
 	/**

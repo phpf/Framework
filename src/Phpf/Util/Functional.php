@@ -202,7 +202,14 @@ namespace {
 	function str_endswith($haystack, $needle) {
 		return Str::endsWith($haystack, $needle);
 	}
-	
+		
+	/**
+	 * Wraps a string in <![CDATA[ {{$str}} ]]>.
+	 */
+	function str_cdata($str) {
+		return '<![CDATA[ '.$str.' ]]>';
+	}
+		
 	/**
 	 * Formats a string by injecting non-numeric characters into 
 	 * the string in the positions they appear in the template.

@@ -4,8 +4,9 @@ namespace Phpf\Util;
 
 use ArrayAccess;
 use Countable;
+use Iterator;
 
-class Container implements ArrayAccess, Countable, iContainer {
+class Container implements ArrayAccess, Countable, Iterator, iContainer {
 	
 	/**
 	 * Magic __set()
@@ -98,6 +99,13 @@ class Container implements ArrayAccess, Countable, iContainer {
 	 */
 	public function count(){
 		return count($this);
+	}
+	
+	/**
+	 * Returns ArrayIterator [Iterator]
+	 */
+	public function getIterator() {
+		return new \ArrayIterator($this->toArray());
 	}
 	
 	/**
