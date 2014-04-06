@@ -36,7 +36,6 @@ class Session implements ArrayAccess
 	
 	public function __set($var, $val) {
 		$_SESSION[$var] = $val;
-		return $this;
 	}
 
 	public function get($var = null) {
@@ -45,11 +44,12 @@ class Session implements ArrayAccess
 			return $_SESSION;
 		}
 
-		return $this->__get($var);
+		return isset($_SESSION[$var]) ? $_SESSION[$var] : null;
 	}
 
 	public function set($var, $val) {
-		return $this->__set($var, $val);
+		$_SESSION[$var] = $val;
+		return $this;
 	}
 
 	public function destroy() {
@@ -72,17 +72,6 @@ class Session implements ArrayAccess
 		}
 	}
 
-	protected function countRequests() {
-
-		if (isset($_SESSION['request_count'])) {
-			$count = $_SESSION['request_count'] + 1;
-		} else {
-			$count = 1;
-		}
-
-		$this->set('request_count', $count);
-	}
-	
 	/**
 	 * @param $index 
 	 * @param $newval 
@@ -114,6 +103,17 @@ class Session implements ArrayAccess
 	 */
 	public function offsetExists($index) {
 		return isset($_SESSION[$index]);
+	}
+	
+	protected function countRequests() {
+
+		if (isset($_SESSION['request_count'])) {
+			$count = $_SESSION['request_count'] + 1;
+		} else {
+			$count = 1;
+		}
+
+		$this->set('request_count', $count);
 	}
 	
 }

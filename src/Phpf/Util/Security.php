@@ -4,39 +4,13 @@ namespace Phpf\Util;
 
 class Security {
 	
-	protected static $hash_key = '1<Kjia6~?qxg*|!RLg<E!*TwB%yq)Fa77O:F))>%>Lp/vw-T1QF!Qm6rFWz1X3bQ';
-	
-	const DEFAULT_HASH_ALGO = 'sha1';
-	
-	public static function setHashKey($key){
-		self::$hash_key = $key;
-	}
-	
-	public static function getHashKey(){
-		return self::$hash_key;
-	}
-	
-	/**
-	 * Generates a verifiable token from seed.
-	 */
-	public static function generateToken($seed, $algo = self::DEFAULT_HASH_ALGO) {
-		return hash_hmac($algo, $seed, self::getHashKey());
-	}
-	
-	/**
-	 * Verifies a token using seed.
-	 */
-	public static function verifyToken($token, $seed, $algo = self::DEFAULT_HASH_ALGO) {
-		return $token === self::generateToken($seed, $algo);
-	}
-	
 	/**
 	 * Generate a v4 UUID.
 	 * That is, a random string of 32 hexadecimal characters (a-f and 0-9) 
 	 * formatted with dashes at certain positions (8-4-4-4-12).
 	 */
 	public static function generateUuid(){
-		$bytes = self::randBytes(16, false);
+		$bytes = static::randBytes(16, false);
 		return Str::formatHash(bin2hex($bytes));
 	}
 	
@@ -44,7 +18,7 @@ class Security {
 	 * Generates a 32-char base64-encoded random string.
 	 */
 	public static function generateCsrfToken(){
-	    return base64_encode(self::generateUuid());
+	    return base64_encode(static::generateUuid());
 	}
 		
 	/**
@@ -55,8 +29,6 @@ class Security {
 	 * 		/dev/urandom
 	 */
 	public static function randBytes( $length = 12, $strong = true ){
-		
-		$isWin = strtoupper(substr(PHP_OS, 0, 3)) !== 'WIN';
 		
 		if ( function_exists('openssl_random_pseudo_bytes') 
 			&& version_compare(PHP_VERSION, '5.3.4') >= 0 
@@ -99,9 +71,9 @@ class Security {
 			);
 	    }
 		
-		return self::randomLib( $length );
+		return static::randomLib( $length );
 	}
-		
+	
 	/**
 	* Author:
 	* George Argyros <argyros.george@gmail.com>

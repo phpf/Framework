@@ -151,8 +151,6 @@ class Container
 			$event = new Event($event);
 		}
 
-		$return = array();
-
 		if (! isset($this->listeners[$event->id])) {
 			return false;
 		}
@@ -177,6 +175,8 @@ class Container
 	 * @return array Array of event callback results
 	 */
 	protected function execute(Event $event, array $Listeners, array $args = array()) {
+
+		$return = array();
 
 		// Sort the listeners.
 		usort($Listeners, array($this, 'sortListeners'));

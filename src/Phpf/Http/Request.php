@@ -58,12 +58,6 @@ class Request {
 	public $params = array();
 	
 	/**
-	 * Whether request is an XML HTTP request
-	 * @var boolean
-	 */
-	public $xhr = false;
-	
-	/**
 	 * Content type requested.
 	 * @var string
 	 */
@@ -86,14 +80,18 @@ class Request {
 	/**
 	 * Build request from $server array
 	 */
-	public function __construct(array $server = null, array $query = null){
+	public function __construct(array $server = null){
 		
 		if (empty($server))	{
 			$server =& $_SERVER;
 		}
 		
-		$this->headers = Http::requestHeaders($server);
-		$this->query = $this->clean(urldecode($server['QUERY_STRING']));
+		$this->headers = http_request_headers($server);
+		
+		if ('' !== $server['QUERY_STRING']) {
+			$this->query = $this->clean(urldecode($server['QUERY_STRING']));
+			parse_str($this->query, $this->query_params);
+		}
 		
 		// Set request path
 		if (isset($server['PATH_INFO'])) {
@@ -101,28 +99,15 @@ class Request {
 		} else {
 			$uri = urldecode($server['REQUEST_URI']);
 			// Remove query string from path
-			$uri = str_replace("?$this->query", '', $uri);
+			if (false !== $qpos = strpos($uri, '?')) {
+				$uri = substr($uri, 0, $qpos);	
+			}
 		}
 		
 		$this->uri = $this->clean($uri);
 		
-		if (isset($query_params)) {
-			$this->query_params = $query_params;
-		} else {
-			parse_str($this->query, $this->query_params);
-		}
-		
-		if (isset($server['REQUEST_METHOD'])) {
-			$method = $server['REQUEST_METHOD'];
-		}
-		
-		// @TODO reconsider just using php://input on body for all methods
-		if (isset($method) && Http::METHOD_POST === $method) {
-			$this->body_params = $_POST;
-		} else {
-			parse_str($this->clean(file_get_contents('php://input')), $this->body_params);
-		}
-		
+		$method = isset($server['REQUEST_METHOD']) ? $server['REQUEST_METHOD'] :'GET';
+				
 		// Override request method if permitted
 		if ($this->allow_method_override) {
 			if (isset($this->headers['x-http-method-override']))
@@ -133,9 +118,12 @@ class Request {
 		
 		$this->method = strtoupper(trim($method));
 		
-		// Is this an XHR request?
-		if (isset($this->headers['x-requested-with'])) {
-			$this->xhr = ('XMLHttpRequest' === $this->headers['x-requested-with']);
+		// Use php://input except when POST w/ enctype="multipart/form-data"
+		// @see {@link http://us3.php.net/manual/en/wrappers.php.php}
+		if ('POST' === $this->method && http_request_header_match('content-type', 'multipart/form-data')) {
+			$this->body_params = $_POST;
+		} else {
+			parse_str($this->clean(file_get_contents('php://input')), $this->body_params);
 		}
 		
 		$this->params = array_merge($this->query_params, $this->body_params);
@@ -228,7 +216,12 @@ class Request {
 	* Returns true if is a XML HTTP request
 	*/
 	public function isXhr(){
-		return (bool)$this->xhr;	
+			
+		if (! isset($this->headers['x-requested-with'])) {
+			return false;
+		}
+		
+		return 'XMLHttpRequest' === $this->headers['x-requested-with'];
 	}
 	
 	/**
@@ -306,7 +299,7 @@ class Request {
 	 */
 	public function setContentType( $type ) {
 		
-		if ($this->isContentTypeAllowed($type)) {
+		if (isset($this->allow_content_types[$type])) {
 			$this->content_type = $type;
 			return true;
 		}
@@ -315,11 +308,11 @@ class Request {
 	}
 
 	/**
-	 * Strips naughty text and slashes from uri components
+	 * Strips non-ASCII text and slashes from uri components
 	 * @uses filter_var() with FILTER_SANITIZE_STRING
 	 */
 	protected function clean( $str ){
-		return trim(filter_var($str, FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_HIGH), '/');	
+		return trim(filter_var($str, FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_HIGH | FILTER_FLAG_STRIP_BACKTICK), '/');	
 	}
 	
 }

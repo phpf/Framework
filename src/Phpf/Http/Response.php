@@ -16,7 +16,7 @@ class Response {
 	const DEFAULT_CONTENT_TYPE = 'text/html';
 
 	/**
-	 * Charset to use in header.
+	 * Charset to use in content-type header.
 	 * @var string
 	 */
 	protected $charset = 'UTF-8';
@@ -230,7 +230,7 @@ class Response {
 	 */
 	public function maybeSetContentType( $type ) {
 
-		if ($this->isKnownContentType($type)) {
+		if (isset($this->content_types[$type])) {
 			$this->setContentType($type);
 			return true;
 		}
@@ -366,15 +366,21 @@ class Response {
 	 */
 	public function sendStatusHeader() {
 
-		if ( ! isset($this->status) ) {
-			$this->status = 200; // assume success
+		if (! isset($this->status)) {
+			if (isset($GLOBALS['HTTP_RESPONSE_CODE'])) {
+				$this->status = $GLOBALS['HTTP_RESPONSE_CODE'];
+			} elseif (isset($this->headers['Location'])) {
+				$this->status = 302;
+			} else {
+				$this->status = 200; // assume success
+			}
 		}
 		
 		$code = $this->status;
 		$desc = Http::statusHeaderDesc($code);
 		$protocol = Http::serverProtocol();
 		
-		header(sprintf("%s %d %s", $protocol, $code, $desc), true, $code);
+		header(sprintf("%s %d %s", $protocol, $code, $desc), false, $code);
 		
 		header(sprintf("Status: %d %s", $code, $desc)); // send extra "Status" header
 		

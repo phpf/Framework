@@ -35,16 +35,16 @@ class Str {
 		
 		preg_replace('/[\x00-\x08\x0B-\x1F]/', '', $string);
 		
-		if ($flag == self::ESC_HTML) {
-			return htmlentities(strip_tags($string), ENT_QUOTES, false);
+		if ($flag === self::ESC_HTML) {
+			return htmlspecialchars($string, ENT_QUOTES, false);
 		}
 		
-		if ($flag == self::ESC_ASCII) {
+		if ($flag === self::ESC_ASCII) {
 			$flag = FILTER_FLAG_STRIP_HIGH;
-		} elseif ($flag == self::ESC_ISO) {
+		} elseif ($flag === self::ESC_ISO) {
 			$flag = FILTER_FLAG_NONE;
 		}
-			
+		
 		return filter_var($string, FILTER_SANITIZE_STRING, $flag);
 	}
 			
@@ -69,9 +69,13 @@ class Str {
 	 */
 	public static function escAlnum( $str, array $extras = null ){
 		
-		$pattern = '/[^a-zA-Z0-9 ';
+		if (! isset($extras) && ctype_alnum($str)) {
+			return $str;
+		}
 		
-		if ( !empty($extras) ){
+		$pattern = '/[^a-zA-Z0-9';
+		
+		if (! empty($extras)) {
 			$pattern .= implode('', $extras);
 		}
 		
@@ -103,34 +107,9 @@ class Str {
 	}
 	
 	/**
-	 * Returns true if $haystack contains $needle.
-	 * 
-	 * @param string $haystack String to search within.
-	 * @param string $needle String to find.
-	 * @return boolean 
-	 */
-	public static function contains( $haystack, $needle ){
-		return false !== strpos($haystack, $needle);
-	}
-	
-	/**
-	 * Removes all found instances of a string from a string.
-	 * 
-	 * Note the function uses str_replace(), so arrays may be
-	 * passed for either parameter as well.
-	 * 
-	 * @param string $str String to search and destroy.
-	 * @param string $from The string to search within.
-	 * @return string The stripped string.
-	 */
-	public static function strip($str, $from) {
-		return str_replace($str, '', $from);
-	}
-	
-	/**
 	 * Returns part of a string starting at the end of a contained string.
 	 * 
-	 * Returns the segment of $haystack starting at end of $needle.
+	 * Alternate desc: Returns the segment of $haystack starting at end of $needle.
 	 * 
 	 * @param string $haystack String to search within.
 	 * @param string $needle String to find.
@@ -148,7 +127,7 @@ class Str {
 	/**
 	 * Returns part of a string up to the first occurance of another string.
 	 * 
-	 * Returns the segment of $haystack up to $needle.
+	 * Alternate desc: Returns the segment of $haystack up to $needle.
 	 * 
 	 * @param string $haystack String to search within.
 	 * @param string $needle String to find.
@@ -218,9 +197,9 @@ class Str {
 		
 		$result = ''; $fpos = 0; $spos = 0;
 		
-		while ( (strlen($template) - 1) >= $fpos ){
+		while ((strlen($template) - 1) >= $fpos) {
 			
-			if ( ctype_alnum(substr($template, $fpos, 1)) ){
+			if (ctype_alnum(substr($template, $fpos, 1))) {
 				$result .= substr($string, $spos, 1);
 				$spos++;
 			} else {
@@ -339,8 +318,10 @@ class Str {
 				break;
 		}
 		
-		for ( $i=0; $i < $length; $i++ ){
-			$str .= substr( $pool, mt_rand(0, strlen($pool) - 1), 1 );
+		$pool_len = strlen($pool) - 1;
+		
+		for ( $i=0; $i < $length; $i++ ) {
+			$str .= substr($pool, mt_rand(0, $pool_len), 1);
 		}
 		
 		return $str;	
@@ -351,7 +332,7 @@ class Str {
 	 */
 	public static function writeCsv( array $data, $filepath ){
 	    
-	    if ( !is_writable($filepath) ){
+	    if (! is_writable($filepath)) {
 	    	throw new \InvalidArgumentException("File given is not writable - $filepath.");
 	    }
 		
@@ -373,7 +354,7 @@ class Str {
 	 * </code>
 	 */
 	public static function pearClass( $str ){
-		$strWithSpaces = self::escAlnum( trim(preg_replace('/[A-Z]/', ' $0', $str)) );
+		$strWithSpaces = self::escAlnum(trim(preg_replace('/[A-Z]/', ' $0', $str)));
 		return str_replace(' ', '_', ucwords($strWithSpaces));
 	}
 	
@@ -388,14 +369,14 @@ class Str {
 	 * Converts a string to "StudlyCaps"
 	 */
 	public static function studlyCaps( $str ){
-		return str_replace(' ', '', ucwords( trim(preg_replace('/[^a-zA-Z]/', ' ', $str)) ));
+		return str_replace(' ', '', ucwords(trim(preg_replace('/[^a-zA-Z]/', ' ', $str))));
 	}
 	
 	/**
 	 * Converts a string to "camelCase"
 	 */
 	public static function camelCase( $str ){
-		return lcfirst( self::studlyCaps($str) );
+		return lcfirst(self::studlyCaps($str));
 	}
 	
 	/**
@@ -461,7 +442,7 @@ class Str {
 	 * @return mixed A scalar data
 	 */
 	public static function maybeSerialize( $data ) {
-		if ( is_array($data) || is_object($data) )
+		if (is_array($data) || is_object($data))
 			return serialize($data);
 		return $data;
 	}

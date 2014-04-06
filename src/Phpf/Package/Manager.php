@@ -43,9 +43,9 @@ class Manager implements iManager {
 					
 				$this->initFunctions($namespace);
 				
-				array_walk($packages, function ($package) use($namespace) {
+				foreach($packages as $package) {
 					$this->loadFunctions($namespace, $package);
-				});
+				}
 			}
 		}
 		
@@ -60,6 +60,8 @@ class Manager implements iManager {
 		if (! empty($this->config['conditional'])) {
 			$this->parseConditionalPackages($this->config['conditional']);
 		}
+		
+		return $this;
 	}
 	
 	public function setClass( $package_type, $class ) {
@@ -171,7 +173,7 @@ class Manager implements iManager {
 	 */
 	public function addPackages( array $packages, $load = false ) {
 			
-		array_walk($packages, function ($package) use ($load) {
+		foreach($packages as $package) {
 			if (0 === strpos($package, 'library.')) {
 				$lib = substr($package, 8);
 				$this->addLibraryByName($lib);
@@ -185,7 +187,7 @@ class Manager implements iManager {
 					$this->load('module.'.$mod);
 				}
 			}
-		});
+		}
 	}
 	
 	/**
@@ -283,10 +285,10 @@ class Manager implements iManager {
 		
 		$all = $this->getAllOfType($type);
 		
-		if (! empty($all)){
-			array_walk($all, function (&$pkg) {
+		if (! empty($all)) {
+			foreach($all as $pkg) {
 				$this->load($pkg);
-			});
+			};
 		}
 		
 		return $this;
@@ -329,7 +331,7 @@ class Manager implements iManager {
 			$val = '';
 			$oper = $findDelim($condition, $val);
 			
-			if (is_null($oper)) {
+			if (! isset($oper)) {
 				continue;
 			}
 			
@@ -368,8 +370,8 @@ class Manager implements iManager {
 	 * 									two items will be used as the type and ID, respectively.
 	 */
 	protected function parseUid( array $args ){
-			
-		if ( 1 === count($args) ){
+		
+		if (! isset($args[1])) {
 			return explode('.', $args[0]);
 		}
 		

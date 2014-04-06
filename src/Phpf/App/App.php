@@ -65,6 +65,7 @@ class App implements ArrayAccess, Countable {
 				'Router'		=> 'Phpf\Routes\Router',
 				'Session'		=> 'Phpf\Util\Session',
 				'Registry' 		=> 'Phpf\Util\Registry',
+				'Helper'		=> 'Phpf\Util\Helper',
 				'Filesystem'	=> 'Phpf\Filesystem\Filesystem',
 				'Database'		=> 'Phpf\Database\Database',
 			),
@@ -105,7 +106,7 @@ class App implements ArrayAccess, Countable {
 	protected function __construct($config) {
 		
 		// create class aliaser, add aliases and register
-		$this->set('aliaser', $aliaser = new ClassAliaser);
+		$this->set('aliaser', $aliaser = new Aliaser);
 		
 		$aliaser->addAliases($config['aliases'])->register();
 				

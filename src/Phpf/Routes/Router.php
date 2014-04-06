@@ -223,7 +223,7 @@ class Router implements iEventable
 	 * Adds an extension to strip from URIs
 	 */
 	public function stripExtension($extension) {
-		$this->strip_extensions[] = ltrim(strtolower($extension), '.');
+		$this->strip_extensions .= '|'.ltrim(strtolower($extension), '.');
 		return $this;
 	}
 
@@ -328,15 +328,11 @@ class Router implements iEventable
 
 					if (isset($this->ep_controller_class)) {
 						// Closure has set a controller class to use for all routes.
-						if (is_string($array)) {
-							$action = $array;
-							$array = array();
+						if (isset($array['action'])) {
 							$array['controller'] = $this->ep_controller_class;
-							$array['action'] = $action;
-						} elseif (isset($array['action'])) {
-							$array['controller'] = $this->ep_controller_class;
+						} else {
+							$array['action'] = trim($epUri, '/');
 						}
-
 						$array['callback'] = array($array['controller'], $array['action']);
 					}
 

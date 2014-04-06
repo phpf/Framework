@@ -64,6 +64,8 @@ class Assets {
 		// get url & attributes
 		list($url, $attrs) = $this->assets[$handle];
 		
+		$attrs['id'] = $handle;
+		
 		if (0 !== strpos($url, '/') && false === strpos($url, '://')) {
 			$url = \Phpf\Util\Path::url($url);
 		}
