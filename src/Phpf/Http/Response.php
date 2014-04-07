@@ -370,7 +370,7 @@ class Response {
 			if (isset($GLOBALS['HTTP_RESPONSE_CODE'])) {
 				$this->status = $GLOBALS['HTTP_RESPONSE_CODE'];
 			} elseif (isset($this->headers['Location'])) {
-				$this->status = 302;
+				$this->status = 307;
 			} else {
 				$this->status = 200; // assume success
 			}

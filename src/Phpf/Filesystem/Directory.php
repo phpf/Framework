@@ -2,7 +2,12 @@
 
 namespace Phpf\Filesystem;
 
-class Directory {
+use InvalidArgumentException;
+use FilesystemIterator;
+use RecursiveIteratorIterator;
+use RecursiveDirectoryIterator;
+
+class Directory extends RecursiveDirectoryIterator {
 	
 	/**
 	 * glob() consts
@@ -48,21 +53,52 @@ class Directory {
 	 */
 	protected $recursion_depth = 5;
 	
+	protected $directory;
+	
+	protected $iterator;
+	
 	public function __construct($path) {
 		
-		if (! is_dir($path = realpath($path))) {
-			throw new InvalidArgumentException("Given path is not a directory - $path");
-		}
+		$path = rtrim($path, '/\\');
+	#	if (! is_dir($path = realpath($path))) {
+	#		throw new InvalidArgumentException("Given path is not a directory - $path");
+	#	}
 		
 		$this->path = $path;
 		
 		$this->is_win = '\\' === DIRECTORY_SEPARATOR;
+		
+		$this->flags = 
+			  FilesystemIterator::KEY_AS_PATHNAME 
+			| FilesystemIterator::CURRENT_AS_FILEINFO 
+			| FilesystemIterator::SKIP_DOTS 
+			| FilesystemIterator::UNIX_PATHS;
+		
+		parent::__construct($this->path, $this->flags);
+	}
+	
+	public function getIterator() {
+		
+		if (! isset($this->iterator)) {
+			$this->iterator = new RecursiveIteratorIterator($this);
+		}
+		
+		return $this->iterator;
+	}
+	
+	public function iterateRegex($pattern = '/^.+\.php$/i') {
+		return new \RegexIterator($this->getIterator(), $pattern, \RecursiveRegexIterator::MATCH, $this->flags);
+	}
+	
+	public function iterateGlob($pattern) {
+		return new \GlobIterator($this->path.$pattern, $this->flags);
 	}
 	
 	public function __get($var) {
 		return $this->$var;
 	}
 	
+	/*
 	public function open() {
 		$this->handle = opendir($this->path);
 		return $this;
@@ -81,6 +117,7 @@ class Directory {
 		rewinddir($this->handle);
 		return $this;
 	}
+	*/
 	
 	public function __destruct() {
 		if (is_resource($this->handle)) {
@@ -118,7 +155,33 @@ class Directory {
 		return $files;
 	}
 	
-	public function find($pattern, $recursive = false) {
+	public function findOne($pattern, $recursive = true) {
+		
+		$flags = $this->is_win ? FNM_NOESCAPE : 0;
+		
+		if (false === $recursive) {
+			foreach($this->getRootItems() as $name => $item) {
+				if (fnmatch($pattern, $item, $flags)) {
+					return $item;
+				}
+			}
+			return null;
+		}
+		
+		if (! isset($this->glob)) {
+			$this->glob = glob_recursive($this->path, $this->recursion_depth);
+		}
+		
+		foreach($this->glob as $path) {
+			if (fnmatch($pattern, $path, $flags)) {
+				return $path;
+			}
+		}
+		
+		return null;
+	}
+	
+	public function findMany($pattern, $recursive = true) {
 		
 		$return = array();
 		$flags = $this->is_win ? FNM_NOESCAPE : 0;
@@ -147,36 +210,8 @@ class Directory {
 		return $return;
 	}
 	
-	public function findOne($pattern, $recursive = true) {
-		
-		$flags = $this->is_win ? FNM_NOESCAPE : 0;
-		
-		if (false === $recursive) {
-				
-			foreach($this->getRootItems() as $name => $item) {
-				if (fnmatch($pattern, $item, $flags)) {
-					return $item;
-				}
-			}
-			
-			return null;
-		}
-		
-		if (! isset($this->glob)) {
-			$this->glob = glob_recursive($this->path, $this->recursion_depth);
-		}
-		
-		foreach($this->glob as $path) {
-			if (fnmatch($pattern, $path, $flags)) {
-				return $path;
-			}
-		}
-		
-		return null;
-	}
-	
-	public function findFile($filename) {
-		return $this->findOne('*'.ltrim($filename, '*'), true);
+	public function findFile($file_pattern) {
+		return $this->findOne('*'.ltrim($file_pattern, '*'), true);
 	}
 	
 	public function setRecusionDepth($val) {

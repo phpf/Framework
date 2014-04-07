@@ -12,35 +12,34 @@ class Resource {
 	protected $resource;
 	
 	public function __construct($resource) {
+			
+		if (! is_callable($resource)) {
+			throw new InvalidArgumentException("Resource must be callable.");
+		}
+		
 		$this->resource = $resource;
 	}
 	
-	public function __invoke( array $args = array() ) {
+	public function __invoke(array $args = array()) {
 		
-		if (is_callable($this->resource)) {
-			
-			$refl = new \Phpf\Util\Reflection\Callback($this->resource);
-			
-			try {
-				$refl->reflectParameters($args);
-			} catch (\Phpf\Util\Reflection\Exception\MissingParam $e) {
-				throw new \RuntimeException("Cannot get dependency - missing param {$e->__toString()}.");
-			}
-			
-			return $refl->invoke();
+		$refl = new \Phpf\Util\Reflection\Callback($this->resource);
 		
+		try {
+			$refl->reflectParameters($args);
+		} catch (\Phpf\Util\Reflection\Exception\MissingParam $e) {
+			throw new \RuntimeException("Cannot get dependency - missing param {$e->__toString()}.");
 		}
+		
+		return $refl->invoke();
 	}
 	
 }
 
 class Factory extends Resource {
 	
-	public function __invoke( array $args = array() ) {
-		
+	public function __invoke(array $args = array()) {
 		return call_user_func_array($this->resource, $args);
 	}
-	
 }
 
 class Container {
@@ -105,14 +104,14 @@ class Container {
 			return new $resource($args);
 		}
 		
-		trigger_error("Could not resolve dependency $resource.");
-		return null;
+		throw new \RuntimeException("Could not resolve dependency $resource.");
 	}
 	
 	public function set( $id, $value, $asSingleton = false ){
 		
 		if (! is_object($value)) {
-			throw new Exception("Must pass closure or object as value to set() - " . gettype($value) . " given.");
+			$msg = "Must pass closure or object as value to set() - " . gettype($value) . " given.";
+			throw new InvalidArgumentException($msg);
 		}
 		
 		if ( $value instanceof Closure ){
