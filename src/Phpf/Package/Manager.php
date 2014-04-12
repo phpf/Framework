@@ -155,8 +155,7 @@ class Manager implements iManager {
 	 */
 	public function addModuleByName( $mod ) {
 		$modClass = $this->getClass('module');
-		$dirpath = $this->getPath('module');
-		$this->add(new $modClass($mod, rtrim($dirpath, '/\\').'/'.ucfirst($mod)));
+		$this->add(new $modClass($mod, rtrim($this->getPath('module'), '/\\').'/'.ucfirst($mod)));
 	}
 	
 	/**
@@ -164,8 +163,7 @@ class Manager implements iManager {
 	 */
 	public function addLibraryByName( $lib ) {
 		$libClass = $this->getClass('library');
-		$dirpath = $this->getPath('library');
-		$this->add(new $libClass($lib, rtrim($dirpath, '/\\').'/'.ucfirst($lib)));
+		$this->add(new $libClass($lib, rtrim($this->getPath('library'), '/\\').'/'.ucfirst($lib)));
 	}
 	
 	/**
@@ -242,7 +240,7 @@ class Manager implements iManager {
 	 * Sets up functions control for namespace
 	 */
 	public function initFunctions($namespace){
-		$this->functional[$namespace] = new Functions($namespace);
+		$this->functional[$namespace] = new PackageFunctions($namespace);
 		return $this;
 	}
 	
@@ -313,7 +311,7 @@ class Manager implements iManager {
 	 */
 	protected function parseConditionalPackages(array $packages) {
 	
-		$operators = array('<=', '>=', '<', '>', '!', '=');
+		$operators = array('<=', '>=', '!=', '<', '=', '>');
 		
 		$findDelim = function ($str, &$value = null) use($operators) {
 			
@@ -331,17 +329,13 @@ class Manager implements iManager {
 			$val = '';
 			$oper = $findDelim($condition, $val);
 			
-			if (! isset($oper)) {
+			if (null === $oper) {
 				continue;
 			}
 			
-			switch(strtoupper(substr($condition, 0, 3))) {
+			switch(substr($condition, 0, 3)) {
 				
-				case 'PHP':
-					
-					if ('!' === $oper) {
-						$oper = '!='; // format for version_compare()
-					}
+				case 'php':
 					
 					if (version_compare(PHP_VERSION, $val, $oper) > 0) {
 						// PHP version is outside given range
@@ -350,9 +344,9 @@ class Manager implements iManager {
 					
 					break;
 				
-				case 'EXT':
+				case 'ext':
 					
-					if ('!' === $oper && ! extension_loaded($val)) {
+					if ('!=' === $oper && ! extension_loaded($val)) {
 						// Extension is not loaded
 						$this->addPackages($_packages, true);
 					}

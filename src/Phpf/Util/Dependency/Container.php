@@ -1,86 +1,115 @@
 <?php
+/**
+ * Dependencies:
+ * 	Type	    Stored		Description
+ * 	===========	=========== ====================
+ * 	1. Objects	(Object)	Given as an object, returns same. Nothing special.
+ * 	2. Factory	(Callable)	Returns a new instance of the requested resource when invoked.
+ *  3. Service	(Class)		Lazily-instantiated; loads a service when invoked.
+ */
 
 namespace Phpf\Util\Dependency;
 
-use Exception;
+use RuntimeException;
+use InvalidArgumentException;
 use Closure;
-
-class Resource {
-	
-	protected $class;
-	
-	protected $resource;
-	
-	public function __construct($resource) {
-			
-		if (! is_callable($resource)) {
-			throw new InvalidArgumentException("Resource must be callable.");
-		}
-		
-		$this->resource = $resource;
-	}
-	
-	public function __invoke(array $args = array()) {
-		
-		$refl = new \Phpf\Util\Reflection\Callback($this->resource);
-		
-		try {
-			$refl->reflectParameters($args);
-		} catch (\Phpf\Util\Reflection\Exception\MissingParam $e) {
-			throw new \RuntimeException("Cannot get dependency - missing param {$e->__toString()}.");
-		}
-		
-		return $refl->invoke();
-	}
-	
-}
-
-class Factory extends Resource {
-	
-	public function __invoke(array $args = array()) {
-		return call_user_func_array($this->resource, $args);
-	}
-}
 
 class Container {
 	
-	protected $objects;
+	/**
+	 * Objects.
+	 * @var array
+	 */
+	protected $object;
 	
-	protected $factories;
+	/**
+	 * Factories.
+	 * @var array
+	 */
+	protected $factory;
 	
-	protected $resources;
+	/**
+	 * Services.
+	 * @var array
+	 */
+	protected $service;
 	
+	/**
+	 * Constructor
+	 */
 	public function __construct(){
-		$this->objects = array();
-		$this->factories = array();
-		$this->resources = array();
+		$this->object = array();
+		$this->factory = array();
+		$this->service = array();
 	}
 	
-	public function register($name, $resource) {
-		
-		if (! $resource instanceof Resource) {
-			$resource = new Resource($resource);
-		}
-		
-		$this->resources[$name] = $resource;
-		
+	/**
+	 * Register a Service
+	 */
+	public function registerService($name, $provider) {
+		$resource = new Service($provider);
+		$this->service[$service] = $resource;
 		return $this;
 	}
 	
-	public function inject($name, $object) {
-		
-		if (! is_object($object)) {
-			trigger_error('Must pass object as second parameter to inject() - '. gettype($object) .' given.');
+	/**
+	 * Register a Factory
+	 */
+	public function registerFactory($name, $callback) {
+		$resource = new Factory($callback);
+		$this->factory[$name] = $resource;
+		return $this;
+	}
+	
+	/**
+	 * Register an Object
+	 */
+	public function registerObject($name, $object) {
+		$resource = new Object($object);
+		$this->object[$name] = $resource;
+		return $this;
+	}
+	
+	public function service($name, array $args = array()) {
+			
+		if (! isset($this->service[$name])) {
 			return null;
 		}
 		
-		$this->objects[$name] = $object;
-		
-		return $this;
+		return $this->service[$name]->resolve($args);
 	}
 	
-	public function factory($name, \Closure $callback) {
-		$this->factories[$name] = $callback;
+	public function factory($name, array $args = array()) {
+			
+		if (! isset($this->factory[$name])) {
+			return null;
+		}
+		
+		return $this->factory[$name]->resolve($args);
+	}
+	
+	public function object($name, array $args = array()) {
+			
+		if (! isset($this->object[$name])) {
+			return null;
+		}
+		
+		return $this->object[$name]->resolve($args);
+	}
+	
+	/**
+	 * Register a something
+	 */
+	public function register($name, $resource_type, $resource) {
+		
+		$methodName = 'register'.ucfirst($resource_type);
+		
+		if (! method_exists($this, $methodName)) {
+			throw new InvalidArgumentException("Unknown resource type '$resource_type'.");
+		}
+		
+		$this->{$resource_type}[$name] = $this->{$methodName}($resource);
+		
 		return $this;
 	}
 	
@@ -130,11 +159,11 @@ class Container {
 	public function get( $id, $args = array(), $asSingleton = false ){
 		
 		if ( $asSingleton ){
-				
-			if ( ! isset($this->singletons[$id]) ){
+			
+			if (! isset($this->singletons[$id])) {
 					
-				if ( ! isset($this->closures[$id]) ){
-					throw new Exception("Unknown singleton $id");
+				if (! isset($this->closures[$id])) {
+					throw new RuntimeException("Unknown singleton $id");
 					return null;
 				}
 				
@@ -150,7 +179,7 @@ class Container {
 		if ( isset($this->closures[$id]) )
 			return call_user_func_array($this->closures[$id], (array) $args);
 		
-		throw new Exception("Unknown resource $id.");
+		throw new RuntimeException("Unknown resource $id.");
 	}
 	
 	public function setSingleton( $id, $value ){

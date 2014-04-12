@@ -13,7 +13,8 @@
 	],
 	"require": {
 		"php": ">=5.3",
-		"ext-pdo": "*"
+		"ext-pdo": "*",
+		"phpf/httputil": "dev-master"
 	},
 	"provide": {
 		"phpf/util": "dev-master",

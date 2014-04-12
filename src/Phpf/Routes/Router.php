@@ -17,11 +17,11 @@ class Router implements iEventable
 	protected $routes = array();
 
 	protected $vars = array(
-		'segment' => '([^_/][^/]+)', 
-		'words' => '(\w\-+)', 
-		'int' => '(\d+)', 
-		'str' => '(.+?)', 
-		'any' => '(.?.+?)', 
+		'segment'	=> '([^_/][^/]+)', 
+		'words'		=> '(\w\-+)', 
+		'int'		=> '(\d+)', 
+		'str'		=> '(.+?)', 
+		'any'		=> '(.?.+?)', 
 	);
 
 	/**
@@ -46,7 +46,7 @@ class Router implements iEventable
 		$this->events = &$events;
 
 		// Default error event
-		$this->on('router.http.404', function($event, $exception, $route, $request, $response) {
+		$this->on('http.404', function($event, $exception, $route, $request, $response) {
 			if (! $event->isDefaultPrevented()) {
 				$response->sendStatusHeader();
 				$response->setBody($exception->getMessage());
@@ -54,41 +54,48 @@ class Router implements iEventable
 			}
 		});
 	}
-
+	
 	/**
 	 * Matches and routes a request URI.
 	 */
 	public function dispatch(Request &$request, Response &$response) {
-
-		timer_start('router');
+		
+		$this->timer('start');
 		
 		$this->request = &$request;
 		$this->response = &$response;
 		
 		if ($this->match()) {
 			
-			timer_end('router');
+			$this->timer('stop');
 			
 			$reflect = new Callback($this->route->getCallback());
 			$this->trigger('dispatch:before', $this->route, $this->request, $this->response);
 
 			try {
-
+				// match request params with callback params, fill in defaults
 				$reflect->reflectParameters($request->getParams());
-
+				
 			} catch (\Phpf\Util\Reflection\Exception\MissingParam $e) {
-
+				// missing a required parameter, throw 404
 				$msg = str_replace('reflection', 'required route', $e->getMessage());
 				$exception = new Exception\MissingParam($msg);
 				$this->error(404, $exception, $this->route);
 			}
-
+			
+			// Invoke the callback
 			$reflect->invoke();
+			
+			// Allow the route to be caught before being sent
 			$this->catchRoute();
+			
+			// Do post-dispatching actions
 			$this->trigger('dispatch:after', $this->route, $this->request, $this->response);
+		
+		} else {
+			// Send 404 with UnknownRoute exception
+			$this->error(404, new Exception\UnknownRoute('Unknown route'), null);
 		}
-
-		$this->error(404, new Exception\UnknownRoute('Unknown route'), null);
 	}
 
 	/**
@@ -212,7 +219,11 @@ class Router implements iEventable
 
 	/**
 	 * Set a controller class to use for the current endpoint.
+	 * 
 	 * @see matchEndpoints()
+	 * 
+	 * @param string $class Controller classname.
+	 * @return $this
 	 */
 	public function setController($class) {
 		$this->ep_controller_class = $class;
@@ -221,6 +232,7 @@ class Router implements iEventable
 
 	/**
 	 * Adds an extension to strip from URIs
+	 * @return $this
 	 */
 	public function stripExtension($extension) {
 		$this->strip_extensions .= '|'.ltrim(strtolower($extension), '.');
@@ -229,6 +241,7 @@ class Router implements iEventable
 
 	/**
 	 * Adds a route catcher
+	 * @return $this
 	 */
 	public function addCatcher(Catcher\AbstractCatcher $catcher, $priority = null) {
 
@@ -249,6 +262,11 @@ class Router implements iEventable
 	 * Adds an action (event) callback. Also used for errors.
 	 *
 	 * Router events use the syntax 'router.<event>'
+	 * 
+	 * @param string $action Event name.
+	 * @param mixed $call Callback to attach to event.
+	 * @param int $priority Priority level of this attachment.
+	 * @return $this
 	 */
 	public function on($action, $call, $priority = 10) {
 		$this->events->on('router.'.$action, $call, $priority);
@@ -257,6 +275,9 @@ class Router implements iEventable
 
 	/**
 	 * Calls action callback(s).
+	 * 
+	 * @param string $action Event name.
+	 * @param mixed ... Arguments to pass to callbacks.
 	 */
 	public function trigger($action /* [, $arg1, ...] */) {
 		$args = func_get_args();
@@ -269,11 +290,42 @@ class Router implements iEventable
 	 * Sends an error using an error handler based on status code, if exists.
 	 *
 	 * Router error events use the syntax 'router.http.<code>'
+	 * 
+	 * @param int $code HTTP response code, determines callbacks.
+	 * @param Exception $e Exception thrown at the error.
+	 * @param Route $route The route that has been matched, if set.
+	 * @return void - Exits after trigger.
 	 */
-	public function error($code, \Exception $exception, Route $route = null) {
+	public function error($code, \Exception $e, Route $route = null) {
 		$this->response->setStatus($code);
-		$this->trigger('http.'.$code, $exception, $route, $this->request, $this->response);
+		$this->trigger('http.'.$code, $e, $route, $this->request, $this->response);
 		exit;
+	}
+
+	/**
+	 * Timer
+	 */
+	protected function timer($start_stop) {
+			
+		if ('start' === $start_stop) {
+			if (function_exists('timer_start')) {
+				timer_start('router');
+				$this->timer = false;
+			} else {
+				$this->timer[$start_stop] = microtime(true);
+			}
+			return $this;
+		}
+
+		if (false === $this->timer) {
+			if ('stop' === $start_stop) {
+				timer_end('router');
+			} else {
+				timer_touch('router');
+			}
+		} else {
+			$this->timer[$start_stop] = microtime(true);
+		}
 	}
 
 	/**
@@ -281,7 +333,7 @@ class Router implements iEventable
 	 */
 	protected function match() {
 
-		$http_method = $this->request->getMethod();
+		$method = $this->request->getMethod();
 
 		// Remove content type file extensions
 		$uri = $this->stripExtensions($this->request->getUri(), $type);
@@ -291,7 +343,7 @@ class Router implements iEventable
 		}
 
 		if (! empty($this->endpoints)) {
-			if ($this->matchEndpoints($uri, $http_method)) {
+			if ($this->matchEndpoints($uri, $method)) {
 				return true;
 			}
 		}
@@ -302,7 +354,7 @@ class Router implements iEventable
 
 			foreach ( $this->routes as $group ) {
 				foreach ( $group as $Route ) {
-					if ($this->matchRoute($Route, $uri, $http_method)) {
+					if ($this->matchRoute($Route, $uri, $method)) {
 						return true;
 					}
 				}
@@ -325,14 +377,18 @@ class Router implements iEventable
 				$routes = $closure($this);
 
 				foreach ( $routes as $epUri => $array ) {
-
-					if (isset($this->ep_controller_class)) {
-						// Closure has set a controller class to use for all routes.
-						if (isset($array['action'])) {
-							$array['controller'] = $this->ep_controller_class;
+					
+					if (! isset($array['action'])) {
+						if (ctype_alpha($slug = trim($epUri, '/'))) {
+							$array['action'] = $slug;
 						} else {
-							$array['action'] = trim($epUri, '/');
+							continue;
 						}
+					}
+					
+					if (isset($this->ep_controller_class) && ! isset($array['controller'])) {
+						// Closure has set a controller class to use for all routes.
+						$array['controller'] = $this->ep_controller_class;
 						$array['callback'] = array($array['controller'], $array['action']);
 					}
 
@@ -396,32 +452,34 @@ class Router implements iEventable
 	protected function parseRoute($uri, &$vars = array()) {
 		
 		// find vars either renamed or inline
-		if (preg_match_all('/<(\w+):(.+?)>/', $uri, $matches)) {
+		if (preg_match_all('/<(\w+):(.+?)>/', $uri, $M)) {
 			
 			// easier to use full match for str_replace() vs re-creating the pattern
-			foreach ( $matches[0] as $i => $str ) {
+			foreach ( $M[0] as $i => $str ) {
 
-				if ('' !== $regex = $this->getRegex($matches[2][$i])) {
+				if ('' !== $regex = $this->getRegex($M[2][$i])) {
 					// Renamed: <id:int>
 					$uri = str_replace($str, $regex, $uri);
-					$vars[$matches[2][$i]] = $matches[1][$i];
+					$vars[$M[2][$i]] = $M[1][$i];
 				} else {
 					// Inline: <year:[\d]{4}>
-					$uri = str_replace($str, '('.$matches[2][$i].')', $uri);
-					$vars[$matches[1][$i]] = $matches[1][$i];
+					$uri = str_replace($str, '('.$M[2][$i].')', $uri);
+					$vars[$M[1][$i]] = $M[1][$i];
 				}
 			}
 		}
 		
 		// find registered <var>'s
-		if (preg_match_all('/<(\w+)>/', $uri, $matches2)) {
+		if (preg_match_all('/<(\w+)>/', $uri, $M2)) {
 
-			foreach ( $matches2[1] as $i => $str ) {
+			foreach ( $M2[1] as $i => $str ) {
 
 				if ($regex = $this->getRegex($str)) {
 					$uri = str_replace('<'.$str.'>', '('.$regex.')', $uri);
 					$vars[$str] = $str;
-				} // @TODO error if route var is unknown?
+				} else {
+					trigger_error("Unknown route var '$str'.", E_USER_NOTICE);
+				}
 			}
 		}
 

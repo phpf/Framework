@@ -26,9 +26,7 @@ class Manager extends DataContainer implements iEventable, iManager
 
 	protected $actions = array();
 
-	protected $layout_regions = array();
-
-	protected $layouts = array();
+	protected $views = array();
 
 	/**
 	 * Construct manager with Finder and Parser (optional)
@@ -77,23 +75,35 @@ class Manager extends DataContainer implements iEventable, iManager
 	final public function manages() {
 		return 'views';
 	}
+	
+	public function getCurrentView() {
+		if (empty($this->views))
+			return null;
+		return reset($this->views);
+	}
 
 	/**
 	 * Find and return a View.
 	 */
 	public function getView($view, $type = 'php') {
-
+		
+		$name = $view .'.'. $type;
+		
+		if (isset($this->views[$name])) {
+			return $this->views[$name];
+		}
+		
 		if (! $parser = $this->getParser($type)) {
 			throw new \RuntimeException("No parser for view type $type.");
 		}
 
-		$file = $this->filesystem->locate($view.'.'.$type, 'views');
+		$file = $this->filesystem->locate($name, 'views');
 
 		if (! $file) {
 			return null;
 		}
-
-		return new View($file, $parser, $this, $this->getData());
+		
+		return $this->views[$name] = new View($file, $parser, $this, $this->getData());
 	}
 
 	/**
@@ -109,7 +119,7 @@ class Manager extends DataContainer implements iEventable, iManager
 
 		return new Part($file, $this->getParser($type), $this->getData());
 	}
-
+	
 	/**
 	 * Add a view parser
 	 */
@@ -206,34 +216,6 @@ class Manager extends DataContainer implements iEventable, iManager
 	 */
 	public function eventsAvailable() {
 		return isset($this->events);
-	}
-
-	public function getLayout($name, $class = 'Phpf\View\Layout') {
-
-		if (! isset($this->layout_regions[$name])) {
-			throw new \OutOfBoundsException("No defined layout with name '$name'.");
-		}
-
-		if ($this->layouts[$name] instanceof Layout)
-			return $this->layouts[$name];
-
-		$regions = $this->getLayoutRegions($name);
-
-		return $this->layouts[$name] = new $class($name, $regions);
-	}
-
-	public function addLayout($name, array $regions) {
-		$this->layout_regions[$name] = $regions;
-		return $this;
-	}
-
-	protected function getLayoutRegions($name) {
-
-		if (! isset($this->layout_regions[$name])) {
-			throw new \OutOfBoundsException("No defined layout with name '$name'.");
-		}
-
-		return $this->layout_regions[$name];
 	}
 
 }
